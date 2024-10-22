@@ -1,6 +1,5 @@
 use crate::bop::CardGameSharedState;
 use crate::engine::application_types::SceneType::BoPTitle;
-use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::input::Input;
 use crate::engine::scene::Scene;
 use crate::engine::state::State;
@@ -38,7 +37,7 @@ impl TitleState {
         }
     }
     pub fn create_init_func(&self) -> fn(&mut Scene, &mut State) {
-        fn init_func(scene: &mut Scene, shared_state: &mut State) {
+        fn init_func(scene: &mut Scene, _: &mut State) {
             scene.show();
             match &mut scene.scene_type {
                 BoPTitle(..) => {}

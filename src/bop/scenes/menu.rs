@@ -64,7 +64,7 @@ impl MenuState {
     }
 
     pub fn create_init_func(&self) -> fn(&mut Scene, &mut State) {
-        fn init_func(scene: &mut Scene, shared_state: &mut State) {
+        fn init_func(scene: &mut Scene, _: &mut State) {
             scene.show();
             if let Scene {
                 scene_type: RPGMenu(menu_state),

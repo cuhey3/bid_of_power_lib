@@ -1,9 +1,9 @@
-use wasm_bindgen::JsCast;
-use wasm_bindgen_test::console_log;
 use crate::bop::mechanism::choice_kind::ChoiceKind;
 use crate::bop::mechanism::choice_kind::ChoiceKind::ChoseNth;
 use crate::engine::choice::{Choice, ChoiceTree};
 use crate::engine::input::Input;
+use wasm_bindgen::JsCast;
+use wasm_bindgen_test::console_log;
 use web_sys::{Document, Element};
 
 #[derive(Debug)]
@@ -11,20 +11,18 @@ pub enum CursorType {
     Default,
     Side,
     Box,
-    Amount,
 }
 
 pub struct Cursor {
     pub element: Element,
     pub chose_index: usize,
     pub choice_length: usize,
-    step_length: f64,
+    pub step_length: f64,
     default_x: f64,
     default_y: f64,
     box_x_length: usize,
     box_y_length: usize,
     pub cursor_type: CursorType,
-    pub cursor_amount: Vec<CursorAmount>,
 }
 
 impl Cursor {
@@ -45,7 +43,6 @@ impl Cursor {
             box_x_length: 0,
             box_y_length: 0,
             cursor_type: CursorType::Default,
-            cursor_amount: vec![],
         }
     }
     pub fn new_with_element(element: Element, step_length: f64) -> Cursor {
@@ -60,8 +57,6 @@ impl Cursor {
             default_y: element.get_attribute("y").unwrap().parse().unwrap(),
             element,
             cursor_type: CursorType::Default,
-
-            cursor_amount: vec![],
         }
     }
     pub fn new(
@@ -83,7 +78,6 @@ impl Cursor {
             box_x_length: 0,
             box_y_length: 0,
             cursor_type: CursorType::Default,
-            cursor_amount: vec![],
         }
     }
 
@@ -93,10 +87,6 @@ impl Cursor {
     pub fn update_choice_length(&mut self, choice_length: usize) {
         self.choice_length = choice_length;
         self.chose_index = self.chose_index.min(self.choice_length - 1);
-    }
-    pub fn update_cursor_amount_with_min_max(&mut self, min_max_list: Vec<[u32; 2]>) {
-        self.cursor_type = CursorType::Amount;
-        self.cursor_amount = CursorAmount::init_with_min_max(self.choice_length, min_max_list);
     }
 
     pub fn set_box_length(&mut self, x_length: usize, y_length: usize) {
@@ -126,19 +116,6 @@ impl Cursor {
                 self.element
                     .set_attribute("y", &*self.default_y.to_string())
                     .unwrap();
-            }
-            CursorType::Amount => {
-                let _ = self.cursor_amount.iter_mut().map(|amount| amount.amount = amount.min_amount);
-                self.element
-                    .set_attribute("y", &*self.default_y.to_string())
-                    .unwrap();
-                self.cursor_amount = vec![CursorAmount {
-                    amount: 1,
-                    initial_amount: 1,
-                    current_amount: 0,
-                    min_amount: 1,
-                    max_amount: 5,
-                }; 4];
             }
         }
     }
@@ -174,33 +151,8 @@ impl Cursor {
                 let expect_index = y * self.box_x_length + x;
                 expect_index.min(self.choice_length)
             }
-            CursorType::Amount => {
-                console_log!("cursor consume 2 {} {:?}", self.chose_index, self.choice_length);
-                match input {
-                    Input::ArrowUp => {
-                        console_log!("cursor consume 3 {} {:?}", self.chose_index, Input::ArrowUp);
-                        (self.chose_index + self.choice_length - 1) % self.choice_length
-                    },
-                    Input::ArrowDown => (self.chose_index + 1) % self.choice_length,
-                    Input::ArrowRight => {
-                        if let Some(amount) = self.cursor_amount.get_mut(self.chose_index) {
-                            amount.amount = (amount.amount + 1).min(amount.max_amount)
-                        }
-                        self.chose_index
-                    },
-                    Input::ArrowLeft => {
-                        if let Some(amount) = self.cursor_amount.get_mut(self.chose_index) {
-                            amount.amount = (amount.amount - 1).max(amount.min_amount)
-                        }
-                        self.chose_index
-                    },
-                    _ => self.chose_index,
-                }
-            }
-
         };
         self.chose_index = new_index;
-        console_log!("cursor consume 4 {} {:?}", self.chose_index, self.cursor_type);
         match self.cursor_type {
             CursorType::Default => {
                 let new_y: f64 = self.default_y + new_index as f64 * self.step_length;
@@ -225,63 +177,15 @@ impl Cursor {
                     .set_attribute("y", new_y.to_string().as_str())
                     .unwrap();
             }
-            CursorType::Amount => {
-                let new_y: f64 = self.default_y + new_index as f64 * self.step_length;
-                // 選択中以外の amount をリセット
-                for (index, amount) in self.cursor_amount.iter_mut().enumerate() {
-                    if index != new_index {
-                        amount.amount= amount.initial_amount;
-                    }
-                }
-                self.element
-                    .set_attribute("y", new_y.to_string().as_str())
-                    .unwrap();
-            }
         }
     }
 }
 
-#[derive(Clone)]
-pub struct CursorAmount {
-    pub amount: u32,
-    pub initial_amount: u32,
-    pub current_amount: u32,
-    pub min_amount: u32,
-    pub max_amount: u32,
-}
-
-impl CursorAmount {
-    pub fn empty() -> CursorAmount {
-        CursorAmount {
-            amount: 0,
-            initial_amount: 0,
-            current_amount: 0,
-            min_amount: 0,
-            max_amount: 0,
-        }
-    }
-    pub fn init_with_min_max(len: usize, min_max_list: Vec<[u32; 2]>) -> Vec<CursorAmount> {
-        let mut cursor_amounts = vec![];
-        for index in 0..len {
-            let min = min_max_list[index][0];
-            let max = min_max_list[index][1];
-            cursor_amounts.push(CursorAmount {
-                amount: min,
-                initial_amount: min,
-                current_amount: 0,
-                min_amount: min,
-                max_amount: max,
-            });
-        }
-        cursor_amounts
-    }
-}
 pub struct SvgRenderer {
     choice_kind: ChoiceKind,
     target_part_name: String,
     wrapper_element: Option<Element>,
     item_element: Option<Element>,
-    amount_element: Option<Element>,
     message_wrapper_element: Option<Element>,
     message_element: Option<Element>,
     pub cursor: Cursor,
@@ -289,8 +193,6 @@ pub struct SvgRenderer {
     item_labels: Vec<String>,
     item_x: f64,
     item_y: f64,
-    amount_x: f64,
-    amount_y: f64,
 }
 
 impl SvgRenderer {
@@ -300,7 +202,6 @@ impl SvgRenderer {
             target_part_name,
             wrapper_element: None,
             item_element: None,
-            amount_element: None,
             message_wrapper_element: None,
             message_element: None,
             cursor: Cursor::empty(),
@@ -308,8 +209,6 @@ impl SvgRenderer {
             item_labels: vec![],
             item_x: 0.0,
             item_y: 0.0,
-            amount_x: 0.0,
-            amount_y: 0.0,
         };
         renderer.load();
         renderer
@@ -357,22 +256,8 @@ impl SvgRenderer {
             self.item_y = element.get_attribute("y").unwrap().parse().unwrap();
         }
     }
-    pub fn load_amount_element(&mut self) {
-        self.amount_element = web_sys::window()
-            .unwrap()
-            .document()
-            .unwrap()
-            .get_element_by_id(&self.get_amount_id());
-        if let Some(element) = &self.amount_element {
-            self.amount_x = element.get_attribute("x").unwrap().parse().unwrap();
-            self.amount_y = element.get_attribute("y").unwrap().parse().unwrap();
-        }
-    }
     pub fn get_item_id(&self) -> String {
         format!("render-{}-item", self.target_part_name)
-    }
-    pub fn get_amount_id(&self) -> String {
-        format!("render-{}-amount", self.target_part_name)
     }
     pub fn load_message_wrapper_element(&mut self) {
         self.message_wrapper_element = web_sys::window()
@@ -401,6 +286,7 @@ impl SvgRenderer {
     }
 
     pub fn render(&mut self, labels: Vec<String>, descriptions: Vec<String>, description: &str) {
+        self.cursor.choice_length = labels.len();
         self.item_labels = labels;
         let document = web_sys::window().unwrap().document().unwrap();
         if let Some(to_remove) = document.get_element_by_id(self.get_rendered_id().as_str()) {
@@ -417,7 +303,11 @@ impl SvgRenderer {
             wrapper_element.set_attribute("display", "block").unwrap();
         }
 
-        while let Some(node) = group_element.query_selector_all(".item-description").unwrap().item(0) {
+        while let Some(node) = group_element
+            .query_selector_all(".item-description")
+            .unwrap()
+            .item(0)
+        {
             let element = node.dyn_into::<Element>().unwrap();
             element.remove();
         }
@@ -431,7 +321,7 @@ impl SvgRenderer {
                 let element = empty_element.parent_element().unwrap();
                 element.set_inner_html(label);
                 match self.cursor.cursor_type {
-                    CursorType::Default | CursorType::Amount => {
+                    CursorType::Default => {
                         element
                             .set_attribute("x", &*self.item_x.to_string())
                             .unwrap();
@@ -461,10 +351,16 @@ impl SvgRenderer {
                 }
                 element.set_attribute("display", "block").unwrap();
                 group_element.append_child(&*element).unwrap();
+                if descriptions.is_empty() {
+                    continue;
+                }
                 match self.cursor.cursor_type {
-                    CursorType::Amount => {
+                    CursorType::Default => {
                         let node = element.clone_node().unwrap();
-                        let empty_element = web_sys::window().unwrap().document().unwrap()
+                        let empty_element = web_sys::window()
+                            .unwrap()
+                            .document()
+                            .unwrap()
                             .create_element_ns(Some("http://www.w3.org/2000/svg"), "text")
                             .unwrap();
                         node.append_child(&*empty_element).unwrap();
@@ -472,29 +368,23 @@ impl SvgRenderer {
                         element.set_inner_html(descriptions[index].as_str());
                         element.class_list().add_1("item-description").unwrap();
                         element
-                            .set_attribute("x", &*(self.item_x + 10.0).to_string())
+                            .set_attribute("x", &*(self.item_x + 15.0).to_string())
                             .unwrap();
                         element
                             .set_attribute(
                                 "y",
-                                &*(self.item_y + index as f64 * self.step_length + 20.0).to_string(),
+                                &*(self.item_y + index as f64 * self.step_length + 20.0)
+                                    .to_string(),
                             )
                             .unwrap();
-                        element.set_attribute("font-size", "12").unwrap();
+                        element.set_attribute("font-size", "11").unwrap();
                         element.set_attribute("display", "block").unwrap();
                         group_element.append_child(&*element).unwrap();
                     }
-                     _ => {}
+                    _ => {}
                 }
             }
         }
-        match self.cursor.cursor_type {
-            CursorType::Amount => {
-                self.render_amount()
-            }
-            _ => {}
-        }
-        // self.cursor.reset();
         self.cursor
             .element
             .set_attribute("display", "block")
@@ -517,65 +407,6 @@ impl SvgRenderer {
     pub fn hide(&self) {
         if let Some(element) = &self.wrapper_element {
             element.set_attribute("display", "none").unwrap();
-        }
-    }
-
-    pub fn render_amount(&mut self) {
-        let document = web_sys::window().unwrap().document().unwrap();
-        let group_element = document
-            .get_element_by_id(self.get_rendered_id().as_str()).unwrap();
-        while let Some(node) = group_element.query_selector_all(".amount").unwrap().item(0) {
-            let element = node.dyn_into::<Element>().unwrap();
-            element.remove();
-        }
-        for index in 0..self.item_labels.len() {
-            if let Some(amount_element) = &self.amount_element {
-                for n in 0..2 {
-                    let node = amount_element.clone_node().unwrap();
-                    let empty_element = web_sys::window().unwrap().document().unwrap()
-                        .create_element_ns(Some("http://www.w3.org/2000/svg"), "text")
-                        .unwrap();
-                    node.append_child(&*empty_element).unwrap();
-                    let element = empty_element.parent_element().unwrap();
-                    if n == 0 {
-                        element.set_inner_html(self.cursor.cursor_amount[index].amount.to_string().as_str());
-                    } else {
-                        if self.cursor.cursor_amount[index].current_amount == 0 {
-                            element.set_inner_html("-");
-                        } else {
-                            element.set_inner_html(self.cursor.cursor_amount[index].current_amount.to_string().as_str());
-                        }
-                    }
-                    element.class_list().add_1("amount").unwrap();
-                    if n == 0 {
-                        element
-                            .set_attribute("x", &*self.amount_x.to_string())
-                            .unwrap();
-                    } else {
-                        element
-                            .set_attribute("x", &*(self.amount_x - 55.0).to_string())
-                            .unwrap();
-                    }
-                    element
-                        .set_attribute(
-                            "y",
-                            &*(self.amount_y + index as f64 * self.step_length).to_string(),
-                        )
-                        .unwrap();
-                    element.set_attribute("display", "block").unwrap();
-                    group_element.append_child(&*element).unwrap();
-                }
-            }
-        }
-    }
-
-    pub fn consume(&mut self, input: Input) {
-        self.cursor.consume(input);
-        match self.cursor.cursor_type {
-            CursorType::Amount => {
-                self.render_amount()
-            }
-            _ => {}
         }
     }
 }
@@ -688,4 +519,13 @@ impl RendererController {
         }
         None
     }
+}
+
+pub fn get_element_by_id(id: String) -> Element {
+    web_sys::window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .get_element_by_id(&*id)
+        .unwrap()
 }

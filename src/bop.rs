@@ -1,20 +1,20 @@
 use crate::bop::scenes::game_main::GameMainState;
-use crate::bop::state::card_game_shared_state::PhaseType::Empty;
+use crate::bop::state::bind::get_binds;
 use crate::bop::state::card_game_shared_state::{
-    AttackTargetMessage, BidMessage, Card, CardGamePlayer, CardKind, GameStartIsApprovedMessage,
-    Phase, PlayerState, UseCardMessage,
+    AttackTargetMessage, BidMessage, CardGamePlayer, GameStartIsApprovedMessage, Phase,
+    PlayerState, UseCardMessage,
 };
 use crate::engine::application_types::StateType;
 use crate::engine::state::{Primitives, References, State};
 use crate::engine::Engine;
 use crate::features::animation::Animation;
-use crate::features::websocket::{ChannelMessage, MessageType, WebSocketWrapper};
+use crate::features::websocket::WebSocketWrapper;
 use crate::svg::Position;
 use crate::svg::SharedElements;
+use mechanism::card::Card;
 use mechanism::item::Item;
 use rand::Rng;
 use scenes::battle::BattleState;
-use scenes::event::EventState;
 use scenes::field::FieldState;
 use scenes::menu::MenuState;
 use scenes::title::TitleState;
@@ -23,7 +23,6 @@ use state::card_game_shared_state::CardGameSharedState;
 use state::character::Character;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::bop::state::bind::get_binds;
 
 pub mod mechanism;
 pub mod scenes;
@@ -135,7 +134,6 @@ pub fn mount() -> Engine {
             inventory: vec![],
             event_flags: vec![],
         }],
-
         // ここからBoP
         players: vec![
             CardGamePlayer {
@@ -155,7 +153,7 @@ pub fn mount() -> Engine {
         ],
         own_player_index: 0,
         cards_bid_on: vec![],
-        bid_input: BidMessage::init(),
+        bid_input: vec![BidMessage::init(), BidMessage::init(), BidMessage::init()],
         bid_scheduled_cards: Card::card_set_default(),
         temporary_bid_history: vec![],
         bid_history: vec![],
@@ -199,6 +197,7 @@ pub fn mount() -> Engine {
             has_continuous_message: false,
         })),
     };
+
     let mut scenes = vec![
         TitleState::create_title_scene(&mut shared_state),
         GameMainState::create_game_main_scene(&mut shared_state),

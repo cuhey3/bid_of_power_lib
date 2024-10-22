@@ -1,3 +1,4 @@
+use crate::bop::mechanism::card::Card;
 use crate::bop::scenes::field::PositionMessage;
 use crate::bop::state::card_game_shared_state::CardKind::*;
 use crate::bop::state::card_game_shared_state::PhaseType::{AttackTarget, Bid, GameStart, UseCard};
@@ -5,10 +6,10 @@ use crate::bop::state::character::Character;
 use crate::bop::SaveData;
 use crate::engine::application_types::StateType;
 use crate::engine::state::State;
-use serde::{Deserialize, Serialize};
-use wasm_bindgen_test::console_log;
 use crate::features::animation::Animation;
 use crate::svg::simple_binder::SimpleBinder;
+use serde::{Deserialize, Serialize};
+use wasm_bindgen_test::console_log;
 
 pub struct CardGameSharedState {
     pub treasure_box_opened: Vec<Vec<usize>>,
@@ -21,7 +22,7 @@ pub struct CardGameSharedState {
     pub own_player_index: usize,
     pub cards_bid_on: Vec<Card>,
     // 入札確定前の入力を管理する
-    pub bid_input: BidMessage,
+    pub bid_input: Vec<BidMessage>,
     pub bid_scheduled_cards: Vec<Card>,
     pub temporary_bid_history: Vec<BidMessage>,
     pub bid_history: Vec<BidMessage>,
@@ -78,34 +79,11 @@ impl PlayerState {
         PlayerState {
             max_hp: 50,
             current_hp: 50,
-            attack_point: 5,
+            attack_point: 10,
             defence_point: 5,
             current_money_amount: 5,
             estimated_money_amount: 3,
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct Card {
-    pub sold_for: u32,
-    pub is_used: bool,
-    pub card_kind: CardKind,
-}
-
-impl Card {
-    pub fn from(card_kind: CardKind) -> Card {
-        Card {
-            sold_for: 0,
-            is_used: false,
-            card_kind,
-        }
-    }
-    pub fn card_set_default() -> Vec<Card> {
-        vec![LongSword, LeatherArmour, Dagger, Balance, Cure]
-            .into_iter()
-            .map(|card_kind| Card::from(card_kind))
-            .collect()
     }
 }
 
@@ -116,6 +94,22 @@ pub enum CardKind {
     Dagger,
     Balance,
     Cure,
+    Shrink,
+    ArmourBreak,
+    GainUp,
+    Weakness,
+    ChainMail,
+    MagicBolt,
+    BuildUp,
+    HPSwap,
+    GoldenHeal,
+    Treasure,
+    GoldenSkin,
+    Chaos,
+    GoldenDagger,
+    ATKSwap,
+    DEFSwap,
+    Excalibur,
 }
 
 impl CardKind {
@@ -126,16 +120,50 @@ impl CardKind {
             Dagger => "ダガー",
             Balance => "バランス",
             Cure => "キュア",
-        }.to_string()
+            Shrink => "シュリンク",
+            ArmourBreak => "アーマーブレイク",
+            GainUp => "ゲインアップ",
+            Weakness => "ウィークネス",
+            ChainMail => "チェインメイル",
+            MagicBolt => "マジックボルト",
+            BuildUp => "ビルドアップ",
+            HPSwap => "HPスワップ",
+            GoldenHeal => "ゴールデンヒール",
+            Treasure => "トレジャー",
+            GoldenSkin => "ゴールデンスキン",
+            Chaos => "カオス",
+            GoldenDagger => "ゴールデンダガー",
+            ATKSwap => "ATKスワップ",
+            DEFSwap => "DEFスワップ",
+            Excalibur => "エクスカリバー",
+        }
+        .to_string()
     }
     pub fn get_card_description(&self) -> String {
         match self {
             LongSword => "自己ATK+10",
             LeatherArmour => "自己DEF+5",
             Dagger => "自己ATK+5",
-            Balance => "自己ATK,DEFを高い方に合わせる,ATK+1,DEF+1",
+            Balance => "自己ATK,DEFを高い方に合わせ+1",
             Cure => "自己HP+20",
-        }.to_string()
+            Shrink => "相手ATK,DEFを低い方に合わせ-1",
+            ArmourBreak => "相手DEF半減",
+            GainUp => "自己獲得Money+1",
+            Weakness => "相手ATK半減",
+            ChainMail => "自己DEF+10",
+            MagicBolt => "相手HP-15",
+            BuildUp => "自己MHP+10,HP+10",
+            HPSwap => "お互いのMHP,HPを入れ替える",
+            GoldenHeal => "自己HP+自己現在Money×2",
+            Treasure => "自己Money+5",
+            GoldenSkin => "自己DEF+自己現在Money",
+            Chaos => "全員HP-5,ATK+5,DEF-5",
+            GoldenDagger => "自己ATK+自己現在Money",
+            ATKSwap => "お互いのATKを入れ替える",
+            DEFSwap => "お互いのDEFを入れ替える",
+            Excalibur => "自己HP+10,ATK+10,DEF+10",
+        }
+        .to_string()
     }
 }
 
@@ -163,6 +191,42 @@ impl BidMessage {
             player_index: 0,
             bid_card_index: 0,
             bid_amount: 1,
+        }
+    }
+    pub fn ready_bid_input(
+        bid_input: &mut Vec<BidMessage>,
+        temporary_bid_history: &Vec<BidMessage>,
+    ) {
+        for input_index in 0..bid_input.len() {
+            bid_input[input_index] = BidMessage::init();
+            bid_input[input_index].bid_card_index = input_index;
+            bid_input[input_index].bid_amount = 1;
+        }
+        if temporary_bid_history.is_empty() {
+            return;
+        }
+        for input_index in 0..bid_input.len() {
+            if let Some(past_bid) = temporary_bid_history
+                .iter()
+                .filter(|history| history.bid_card_index == input_index)
+                .last()
+            {
+                bid_input[input_index].bid_amount = past_bid.bid_amount + 2
+            };
+        }
+    }
+
+    pub fn current_bid_amount(card_index: usize, temporary_bid_history: &Vec<BidMessage>) -> u32 {
+        if temporary_bid_history.is_empty() {
+            0
+        } else if let Some(last_bid) = temporary_bid_history
+            .iter()
+            .filter(|history| history.bid_card_index == card_index)
+            .last()
+        {
+            last_bid.bid_amount
+        } else {
+            0
         }
     }
 }
@@ -352,7 +416,7 @@ impl Phase {
                     .temporary_bid_history
                     .iter()
                     .enumerate()
-                    .filter(|(temporary_history_index, bid)| bid.player_index == player_index)
+                    .filter(|(_, bid)| bid.player_index == player_index)
                     .last();
                 if found.is_none() {
                     let input_player_index = game_state
@@ -599,7 +663,7 @@ impl CardGameSharedState {
         console_log!("cpc 2");
         check_func(self)
     }
-    pub fn phase_shift_to(&mut self, animations: &mut Vec<Vec<Animation>>, next_phase_index: usize) {
+    pub fn phase_shift_to(&mut self, _: &mut Vec<Vec<Animation>>, next_phase_index: usize) {
         let now_phase_index = self.phase_index;
         match self.phases[next_phase_index].phase_type {
             Bid => match now_phase_index {
@@ -610,17 +674,83 @@ impl CardGameSharedState {
                     }
                 }
                 1 => {
-                    for player_index in 0..self.players.len() {
-                        let last_bid = self.temporary_bid_history.iter().filter(|history|history.player_index == player_index).last().unwrap();
-                        let card = self.cards_bid_on.remove(last_bid.bid_card_index);
-                        animations.push(vec![Animation::create_message(format!("{}: {}を {} で落札", self.players[last_bid.player_index].player_name, card.card_kind.get_card_name(),last_bid.bid_amount))]);
-                        self.players[player_index].own_card_list.push(card);
+                    // 入札中リストの後ろから対象の履歴を探す
+                    // 途中で cards_bid_on に対して remove するのでインデックスがズレないように
+                    let bid_on_len = self.cards_bid_on.len();
+                    for bid_on_index_reverse in 0..bid_on_len {
+                        if let Some((history_index, history)) = self
+                            .temporary_bid_history
+                            .iter_mut()
+                            .enumerate()
+                            .filter(|(_, history)| {
+                                bid_on_len - bid_on_index_reverse - 1 == history.bid_card_index
+                            })
+                            .last()
+                        {
+                            let player_index = history.player_index;
+                            let history = self.temporary_bid_history.remove(history_index);
+                            self.players[player_index].player_state.current_money_amount =
+                                self.players[player_index].player_state.current_money_amount
+                                    - history.bid_amount
+                                    + self.players[player_index]
+                                        .player_state
+                                        .estimated_money_amount;
+                            self.bid_history.push(history);
+                            let item = self
+                                .cards_bid_on
+                                .remove(bid_on_len - bid_on_index_reverse - 1);
+                            self.players[player_index].own_card_list.push(item);
+                        } else {
+                            // cards_bid_on の中には落札されていないアイテムも当然存在する
+                        };
                     }
                     self.temporary_bid_history.clear();
                     while self.cards_bid_on.len() < 3 && self.bid_scheduled_cards.len() > 0 {
                         let card = self.bid_scheduled_cards.remove(0);
                         self.cards_bid_on.push(card);
                     }
+                    BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
+                }
+                _ => {}
+            },
+            UseCard => match now_phase_index {
+                1 => {
+                    // 入札中リストの後ろから対象の履歴を探す
+                    // 途中で cards_bid_on に対して remove するのでインデックスがズレないように
+                    let bid_on_len = self.cards_bid_on.len();
+                    for bid_on_index_reverse in 0..bid_on_len {
+                        if let Some((history_index, history)) = self
+                            .temporary_bid_history
+                            .iter_mut()
+                            .enumerate()
+                            .filter(|(_, history)| {
+                                bid_on_len - bid_on_index_reverse - 1 == history.bid_card_index
+                            })
+                            .last()
+                        {
+                            let player_index = history.player_index;
+                            let history = self.temporary_bid_history.remove(history_index);
+                            self.players[player_index].player_state.current_money_amount =
+                                self.players[player_index].player_state.current_money_amount
+                                    - history.bid_amount
+                                    + self.players[player_index]
+                                        .player_state
+                                        .estimated_money_amount;
+                            self.bid_history.push(history);
+                            let item = self
+                                .cards_bid_on
+                                .remove(bid_on_len - bid_on_index_reverse - 1);
+                            self.players[player_index].own_card_list.push(item);
+                        } else {
+                            // cards_bid_on の中には落札されていないアイテムも当然存在する
+                        };
+                    }
+                    self.temporary_bid_history.clear();
+                    while self.cards_bid_on.len() < 3 && self.bid_scheduled_cards.len() > 0 {
+                        let card = self.bid_scheduled_cards.remove(0);
+                        self.cards_bid_on.push(card);
+                    }
+                    BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
                 }
                 _ => {}
             },

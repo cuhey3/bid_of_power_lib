@@ -1,3 +1,4 @@
+use crate::engine::application_types::StateType::BoPShared;
 use crate::features::animation::Animation;
 use crate::features::websocket::{ChannelMessage, WebSocketWrapper};
 use input::Input;
@@ -5,8 +6,6 @@ use scene::Scene;
 use state::State;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_test::console_log;
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
-use crate::engine::application_types::StateType::BoPShared;
 
 pub mod application_types;
 pub mod choice;
@@ -208,27 +207,15 @@ impl Engine {
         }
         if let State {
             state_type: BoPShared(card_game_shared_state),
-            interrupt_animations,
-            to_send_channel_messages,
             ..
-        } = &mut self.shared_state {
+        } = &mut self.shared_state
+        {
             for n in 0..card_game_shared_state.simple_binders.len() {
+                // 自己参照を含んでいるので一旦 SimpleBinder の clone をして、戻す
                 let mut binder = card_game_shared_state.simple_binders[n].clone();
-                binder.sync(card_game_shared_state)
+                let binder = binder.sync(card_game_shared_state);
+                card_game_shared_state.simple_binders[n] = binder.clone();
             }
         }
     }
-}
-
-pub struct Phase {
-    phase_type: PhaseType,
-    check_phase_end_func: fn(&mut State) -> (bool, Phase),
-}
-
-pub enum PhaseType {
-    GameStart,
-    Bid(usize),
-    UseCard(usize),
-    ShowBattle,
-    GameEnd,
 }

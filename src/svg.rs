@@ -2,8 +2,8 @@ use crate::svg::element_wrapper::ElementWrapper;
 use web_sys::Document;
 
 pub mod element_wrapper;
-pub mod svg_renderer;
 pub mod simple_binder;
+pub mod svg_renderer;
 
 pub struct SharedElements {
     pub message: ElementWrapper,
