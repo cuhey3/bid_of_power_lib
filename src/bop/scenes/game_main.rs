@@ -1,4 +1,3 @@
-use crate::bop::mechanism::choice_kind::ChoiceKind::{Confirm, Menu};
 use crate::bop::state::card_game_shared_state::{
     AttackTargetMessage, BidMessage, CheckPhaseCompleteResult, GameStartIsApprovedMessage,
     UseCardMessage,
@@ -22,7 +21,7 @@ pub struct GameMainState {
 
 impl GameMainState {
     pub fn create_game_main_scene(shared_state: &mut State) -> Scene {
-        let mut renderer = SvgRenderer::new(Menu, "game-main-bid".to_string(), 45.0);
+        let mut renderer = SvgRenderer::new("game-main-bid".to_string(), 45.0);
         renderer.cursor.update_choice_length(3);
         console_log!(
             "cursor info {:?} {:?} {:?}",
@@ -34,8 +33,8 @@ impl GameMainState {
         let mut game_main_state = GameMainState {
             renderers: vec![
                 renderer,
-                SvgRenderer::new(Confirm, "game-main-common-confirm".to_string(), 30.0),
-                SvgRenderer::new(Menu, "game-main-battle".to_string(), 30.0),
+                SvgRenderer::new("game-main-common-confirm".to_string(), 30.0),
+                SvgRenderer::new("game-main-battle".to_string(), 30.0),
             ],
             is_bid_confirm_opened: false,
             is_card_use_confirm_opened: false,
@@ -283,18 +282,7 @@ impl GameMainState {
                     ..
                 } = shared_state
                 {
-                    let found = card_game_shared_state
-                        .online_users
-                        .iter_mut()
-                        .enumerate()
-                        .find(|(_, user)| user.user_name == message.user_name);
                     match message.message_type {
-                        MessageType::Left => {
-                            if found.is_some() {
-                                let remove_index = found.unwrap().0;
-                                card_game_shared_state.online_users.remove(remove_index);
-                            }
-                        }
                         MessageType::Message => {
                             if let Ok(message) =
                                 serde_json::from_str::<GameStartIsApprovedMessage>(&message.message)

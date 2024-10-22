@@ -1,4 +1,3 @@
-use crate::bop::CardGameSharedState;
 use crate::engine::application_types::SceneType::BoPTitle;
 use crate::engine::input::Input;
 use crate::engine::scene::Scene;
@@ -56,7 +55,6 @@ impl TitleState {
                     Input::Enter => {
                         if title_state.cursor.chose_index == 0 {
                             shared_state.primitives.requested_scene_index = 1;
-                            CardGameSharedState::new_game(shared_state);
                         } else if title_state.cursor.chose_index == 1 {
                             shared_state.interrupt_animations.push(vec![
                                 Animation::create_message("Coming soon...".to_string()),
