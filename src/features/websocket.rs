@@ -67,7 +67,7 @@ impl WebSocketWrapper {
             console_log!("websocket connection opened.");
             let channel_user = ChannelUser {
                 user_name: clone.user_name.to_owned(),
-                channel_name: "rpg".to_string(),
+                channel_name: "bop".to_string(),
             };
             clone
                 .ws

@@ -75,9 +75,10 @@
 <svg width="800" height="800" id="title" display="none">
     <g transform="translate(0, 50)">
         <text x="200" y="180" font-size="60" fill="white">BID OF POWER</text>
-        <text x="310" y="280" fill="white" font-size="30">一人で遊ぶ</text>
-        <text x="310" y="340" fill="white" font-size="30">オンライン対戦</text>
-        <text x="250" y="285" fill="white" font-size="40" id="title-cursor">👉</text>
+        <text x="310" y="280" fill="white" font-size="30" text-decoration="line-through">CPUと遊ぶ</text>
+        <text x="310" y="340" fill="white" font-size="30">一緒に遊ぶ</text>
+        <text x="310" y="400" fill="white" font-size="30">オンライン対戦</text>
+        <text x="250" y="345" fill="white" font-size="40" id="title-cursor">👉</text>
     </g>
     <text x="590" y="30" fill="white" font-size="20">Aキー: 決定</text>
     <text x="590" y="60" fill="white" font-size="20">Zキー: 取消・メニュー</text>
@@ -164,8 +165,8 @@
         <text x="640" y="503" fill="white" font-size="11" id="simple-binder-card-list-b-8-description"></text>
         <text x="640" y="542" fill="white" font-size="11" id="simple-binder-card-list-b-9-description"></text>
         <text x="640" y="581" fill="white" font-size="11" id="simple-binder-card-list-b-10-description">その説明</text>
-        <text x="400" y="218" fill="white" font-size="18" id="use-item-cursor-a">👉</text>
-        <text x="595" y="218" fill="white" font-size="18" id="use-item-cursor-b">👉</text>
+        <text x="400" y="218" fill="white" font-size="18" id="use-item-cursor-a"></text>
+        <text x="595" y="218" fill="white" font-size="18" id="use-item-cursor-b"></text>
     </g>
     <g transform="translate(0, 65)" id="scheduled-card-list">
         <text x="315" y="215" fill="white" font-size="13">入札予定</text>
@@ -210,10 +211,6 @@
         <text x="150" y="608" fill="white" font-size="11" id="simple-binder-scheduled-card-description-19" >1　ロングソード</text>
     </g>
     <g transform="translate(0, 20)" id="render-game-main-bid-wrapper" display="none">
-
-<!--        <rect x="20" y="545" stroke="white" height="45" width="760" id="render-game-main-bid-message-wrapper"-->
-<!--              display="none"></rect>-->
-<!--        <text x="30" y="575" fill="white" font-size="18" id="render-game-main-bid-message"></text>-->
         <rect x="20" y="80" width="350" height="160" stroke="white" fill="black"></rect>
         <text x="70" y="110" fill="white" font-size="15" id="render-game-main-bid-item" display="none"></text>
         <text x="350" y="113" fill="white" font-size="18" id="simple-binder-input-amount-1" text-anchor="end" display="none"></text>
@@ -223,7 +220,7 @@
         <text x="295" y="158" fill="white" font-size="18" id="simple-binder-current-amount-2" text-anchor="end" display="none"></text>
         <text x="295" y="203" fill="white" font-size="18" id="simple-binder-current-amount-3" text-anchor="end" display="none"></text>
         <text x="295" y="203" fill="white" font-size="18" id="simple-binder-current-amount-3" text-anchor="end" display="none"></text>
-        <text x="30" y="115" fill="white" font-size="24" id="render-game-main-bid-cursor" display="none">👉</text>
+        <text x="30" y="115" fill="white" font-size="24" id="render-game-main-bid-cursor" display="none"></text>
         <text x="255" y="70" fill="white" font-size="13">現在価格</text>
         <text x="315" y="70" fill="white" font-size="13">入札価格</text>
     </g>
@@ -234,6 +231,16 @@
         <rect x="640" y="15" width="140" height="85" stroke="white" fill="black"></rect>
         <text x="693" y="52" fill="white" font-size="20" id="render-game-main-common-confirm-item" display="none"></text>
         <text x="658" y="52" fill="white" font-size="20" id="render-game-main-common-confirm-cursor"
+              display="none">👉
+        </text>
+    </g>
+    <g transform="translate(0, 0)" id="render-game-main-battle-wrapper" display="none">
+        <rect x="20" y="15" stroke="white" height="55" width="760" id="render-game-main-battle-message-wrapper"
+              display="none"></rect>
+        <text x="30" y="50" fill="white" font-size="18" id="render-game-main-battle-message"></text>
+        <rect x="520" y="15" width="260" height="85" stroke="white" fill="black"></rect>
+        <text x="565" y="52" fill="white" font-size="20" id="render-game-main-battle-item" display="none"></text>
+        <text x="535" y="52" fill="white" font-size="20" id="render-game-main-battle-cursor"
               display="none">👉
         </text>
     </g>

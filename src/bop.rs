@@ -135,6 +135,7 @@ pub fn mount() -> Engine {
             event_flags: vec![],
         }],
         // ここからBoP
+        is_online: false,
         players: vec![
             CardGamePlayer {
                 player_name: "プレイヤー1".to_string(),

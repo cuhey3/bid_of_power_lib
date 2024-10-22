@@ -1,7 +1,7 @@
 use crate::bop::mechanism::card::Card;
 use crate::bop::scenes::field::PositionMessage;
 use crate::bop::state::card_game_shared_state::CardKind::*;
-use crate::bop::state::card_game_shared_state::PhaseType::{AttackTarget, Bid, GameStart, UseCard};
+use crate::bop::state::card_game_shared_state::PhaseType::*;
 use crate::bop::state::character::Character;
 use crate::bop::SaveData;
 use crate::engine::application_types::StateType;
@@ -18,6 +18,7 @@ pub struct CardGameSharedState {
     pub characters: Vec<Character>,
 
     // ここからカードゲーム用
+    pub is_online: bool,
     pub players: Vec<CardGamePlayer>,
     pub own_player_index: usize,
     pub cards_bid_on: Vec<Card>,
@@ -178,7 +179,7 @@ pub struct GameStartIsApprovedMessage {
     pub game_start_is_approved: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct BidMessage {
     pub player_index: usize,
     pub bid_card_index: usize,
@@ -391,13 +392,11 @@ impl Phase {
                 next_phase_index: None,
                 is_required_own_input_for_complete: None,
             };
-
             let temporary_history_len = game_state.temporary_bid_history.len();
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
             // 入札が一巡していない場合のロジック
             if temporary_history_len < player_len {
-                result.is_phase_complete = false;
                 // 優先順位順に入札しているので、次に入札すべきプレイヤーは temporary_history の長さで決まる（一巡しない間）
                 let next_player_index =
                     game_state.initiatives_to_player_index[temporary_history_len];
@@ -405,7 +404,6 @@ impl Phase {
                     Some(next_player_index == own_player_index);
                 return result;
             }
-
             // 以降は、入札が一巡している
             // 各プレイヤーについて、"最終の"入札済みカードのインデックスを集める
             let mut player_index_to_target_card_index = vec![0; player_len];
@@ -430,7 +428,6 @@ impl Phase {
                 player_index_to_target_card_index[player_index] = found.unwrap().1.bid_card_index;
                 player_index_to_last_bid_index[player_index] = found.unwrap().0;
             }
-
             // 各プレイヤーについて、競合を持つかをフラグで集める
             let mut player_index_to_has_competitor_flag = vec![false; player_len];
             for player_a_index in 1..player_len {
@@ -444,7 +441,6 @@ impl Phase {
                     }
                 }
             }
-
             // 競合がなければ（次が何のフェースでも）完了
             result.is_phase_complete = player_index_to_has_competitor_flag
                 .iter()
@@ -458,9 +454,10 @@ impl Phase {
                 } else {
                     result.next_phase_index = Some(UseCard as i32 as usize);
                 }
+                console_log!("debug...list {:?}", game_state.players[0].own_card_list);
+                console_log!("debug...is_continuous_bid {:?}", is_continuous_bid);
                 return result;
             }
-
             // 競合が見つかっている場合のロジック
             // 自分が競合していなければ、単純に false をセットして返却
             if !player_index_to_has_competitor_flag[own_player_index] {
@@ -589,7 +586,15 @@ impl Phase {
             };
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
-
+            if let Some(_) = game_state
+                .players
+                .iter()
+                .find(|player| player.player_state.current_hp == 0)
+            {
+                result.is_phase_complete = true;
+                result.next_phase_index = Some(GameEnd as i32 as usize);
+                return result;
+            };
             // このターンの攻撃対象決定履歴を収集
             let this_turn_attack_target_history = game_state
                 .attack_target_history
@@ -632,7 +637,16 @@ impl Phase {
                 .all(|flag| *flag)
             {
                 result.is_phase_complete = true;
-                result.next_phase_index = Some(Bid as i32 as usize);
+                if game_state.cards_bid_on.is_empty() {
+                    game_state.turn += 1;
+                    if game_state.players[0].own_card_list.is_empty() {
+                        result.next_phase_index = Some(AttackTarget as i32 as usize);
+                    } else {
+                        result.next_phase_index = Some(UseCard as i32 as usize);
+                    }
+                } else {
+                    result.next_phase_index = Some(Bid as i32 as usize);
+                }
                 return result;
             }
             // 次の攻撃対象決定者を探索
@@ -665,6 +679,10 @@ impl CardGameSharedState {
     }
     pub fn phase_shift_to(&mut self, _: &mut Vec<Vec<Animation>>, next_phase_index: usize) {
         let now_phase_index = self.phase_index;
+        if next_phase_index == 4 {
+            console_log!("battle end");
+            return;
+        }
         match self.phases[next_phase_index].phase_type {
             Bid => match now_phase_index {
                 0 => {
@@ -710,6 +728,9 @@ impl CardGameSharedState {
                         self.cards_bid_on.push(card);
                     }
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
+                }
+                3 => {
+                    self.turn += 1;
                 }
                 _ => {}
             },

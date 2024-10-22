@@ -23,7 +23,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             ),
 
             3 => format!(
-                "{}さん、攻撃対象を選んでください。上下: 選択　A: 決定",
+                "{}さん、攻撃対象を選んでください。",
                 card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
             ),
             _ => "".to_string(),
@@ -262,5 +262,39 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             player_status,
         ));
     }
+    for n in 0..2 {
+        fn use_item_cursor(
+            card_game_shared_state: &mut CardGameSharedState,
+            args_usize: usize,
+        ) -> String {
+            if card_game_shared_state.phase_index == 2
+                && card_game_shared_state.own_player_index == args_usize
+            {
+                "👉".to_string()
+            } else {
+                "".to_string()
+            }
+        }
+        binds.push(SimpleBinder::new(
+            get_element_by_id(format!(
+                "use-item-cursor-{}",
+                if n == 0 { "a" } else { "b" }
+            )),
+            n,
+            use_item_cursor,
+        ));
+    }
+    fn bid_cursor(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
+        if card_game_shared_state.phase_index == 1 {
+            "👉".to_string()
+        } else {
+            "".to_string()
+        }
+    }
+    binds.push(SimpleBinder::new(
+        get_element_by_id("render-game-main-bid-cursor".to_string()),
+        0,
+        bid_cursor,
+    ));
     binds
 }
