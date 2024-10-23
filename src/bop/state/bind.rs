@@ -90,7 +90,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             current_amount_func,
         ));
     }
-    for n in 0..10 {
+    for n in 0..11 {
         fn card_list_a(
             card_game_shared_state: &mut CardGameSharedState,
             args_usize: usize,
@@ -327,7 +327,27 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             initiative,
         ));
     }
-    // simple-binder-initiative-a
+
+    for n in 0..2 {
+        fn damage(card_game_shared_state: &mut CardGameSharedState, args_usize: usize) -> String {
+            let own_player_state = &card_game_shared_state.players[args_usize].player_state;
+            let opponent_player_state = &card_game_shared_state.players
+                [(args_usize + 1) % card_game_shared_state.players.len()]
+            .player_state;
+            (opponent_player_state.attack_point as i32 - own_player_state.defence_point as i32)
+                .max(1)
+                .to_string()
+        }
+        binds.push(SimpleBinder::new(
+            get_element_by_id(format!(
+                "simple-binder-status-damage-{}",
+                if n == 0 { "a" } else { "b" }
+            )),
+            n,
+            damage,
+        ));
+    }
+
     fn bid_cursor(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
         if card_game_shared_state.phase_index == 1 {
             "👉".to_string()

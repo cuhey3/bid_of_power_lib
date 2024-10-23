@@ -1,5 +1,6 @@
 use crate::bop::state::card_game_shared_state::CardKind::*;
 use crate::bop::state::card_game_shared_state::{CardGameSharedState, CardKind};
+use rand::prelude::SliceRandom;
 use wasm_bindgen_test::console_log;
 
 #[derive(Debug)]
@@ -18,14 +19,14 @@ impl Card {
         }
     }
     pub fn card_set_default() -> Vec<Card> {
-        vec![
+        let mut rng = rand::thread_rng();
+        let mut cards = vec![
             Treasure,
             GoldenSkin,
             Chaos,
             GoldenDagger,
             ATKSwap,
             DEFSwap,
-            Excalibur,
             Shrink,
             ArmourBreak,
             LongSword,
@@ -44,7 +45,10 @@ impl Card {
         ]
         .into_iter()
         .map(|card_kind| Card::from(card_kind))
-        .collect()
+        .collect::<Vec<Card>>();
+        cards.shuffle(&mut rng);
+        cards.push(Card::from(Excalibur));
+        cards
     }
 
     pub fn create_update_status_func(

@@ -99,6 +99,7 @@ impl GameMainState {
             if let State {
                 state_type: BoPShared(card_game_shared_state),
                 to_send_channel_messages,
+                interrupt_animations,
                 ..
             } = shared_state
             {
@@ -124,7 +125,8 @@ impl GameMainState {
                                     .player_state
                                     .current_money_amount;
                                 card_game_shared_state.bid_input[cursor_index].bid_amount =
-                                    (bid_amount + 1).min(player_money);
+                                    // プレイヤーの持ち金より最低入札価格が高い場合はそちらを参照しなければならない
+                                    (bid_amount + 1).min(player_money.max(bid_amount));
                             }
                             Input::ArrowLeft => {
                                 if game_main_state.is_bid_confirm_opened {
@@ -136,8 +138,15 @@ impl GameMainState {
                                     cursor_index,
                                     &card_game_shared_state.temporary_bid_history,
                                 );
+                                // 現在価格が0なら最低入札価格は1
+                                // 現在価格が1以上なら、最低入札価格は現在価格+2
+                                let lowest_amount = if current_bid_amount == 0 {
+                                    1
+                                } else {
+                                    current_bid_amount + 2
+                                };
                                 card_game_shared_state.bid_input[cursor_index].bid_amount =
-                                    (bid_amount - 1).max(current_bid_amount).max(1);
+                                    (bid_amount - 1).max(lowest_amount);
                             }
 
                             Input::ArrowDown | Input::ArrowUp => {
@@ -175,6 +184,17 @@ impl GameMainState {
                                         .get_card_name();
                                     let amount =
                                         card_game_shared_state.bid_input[cursor_index].bid_amount;
+                                    if card_game_shared_state.players
+                                        [card_game_shared_state.own_player_index]
+                                        .player_state
+                                        .current_money_amount
+                                        < amount
+                                    {
+                                        interrupt_animations.push(vec![Animation::create_message(
+                                            "Moneyが足りません".to_string(),
+                                        )]);
+                                        return;
+                                    }
                                     game_main_state.renderers[1].render(
                                         vec!["はい".to_string(), "いいえ".to_string()],
                                         vec![],
