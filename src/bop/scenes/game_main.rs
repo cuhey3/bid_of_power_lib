@@ -7,6 +7,7 @@ use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::input::Input;
 use crate::engine::scene::Scene;
 use crate::engine::state::State;
+use crate::features::animation::Animation;
 use crate::features::websocket::{ChannelMessage, MessageType};
 use crate::svg::element_wrapper::ElementWrapper;
 use crate::svg::svg_renderer::{Cursor, SvgRenderer};
@@ -16,6 +17,7 @@ pub struct GameMainState {
     renderers: Vec<SvgRenderer>,
     is_bid_confirm_opened: bool,
     is_card_use_confirm_opened: bool,
+    is_card_use_skip_confirm_opened: bool,
     use_item_cursors: Vec<Cursor>,
 }
 
@@ -38,6 +40,7 @@ impl GameMainState {
             ],
             is_bid_confirm_opened: false,
             is_card_use_confirm_opened: false,
+            is_card_use_skip_confirm_opened: false,
             use_item_cursors: vec![
                 Cursor::new(
                     &shared_state.elements.document,
@@ -72,12 +75,21 @@ impl GameMainState {
         }
     }
     pub fn create_init_func(&self) -> fn(&mut Scene, &mut State) {
-        fn init_func(scene: &mut Scene, _: &mut State) {
+        fn init_func(scene: &mut Scene, state: &mut State) {
             console_log!("init game main scene");
             scene.show();
             match &mut scene.scene_type {
                 BoPGameMain(..) => {}
                 _ => panic!(),
+            }
+            if let BoPShared(card_game_shared_state) = &mut state.state_type {
+                state.to_send_channel_messages.push(
+                    serde_json::to_string(&GameStartIsApprovedMessage {
+                        player_index: card_game_shared_state.own_player_index,
+                        game_start_is_approved: true,
+                    })
+                    .unwrap(),
+                );
             }
         }
         init_func
@@ -90,6 +102,9 @@ impl GameMainState {
                 ..
             } = shared_state
             {
+                if card_game_shared_state.input_is_guard {
+                    return;
+                }
                 if let Scene {
                     scene_type: BoPGameMain(game_main_state),
                     ..
@@ -163,8 +178,11 @@ impl GameMainState {
                                     game_main_state.renderers[1].render(
                                         vec!["はい".to_string(), "いいえ".to_string()],
                                         vec![],
-                                        format!("{} を {} で入札しますか？", item_name, amount)
-                                            .as_str(),
+                                        format!(
+                                            "{} を {} Moneyで入札しますか？",
+                                            item_name, amount
+                                        )
+                                        .as_str(),
                                     );
                                     game_main_state.is_bid_confirm_opened = true;
                                 }
@@ -174,7 +192,9 @@ impl GameMainState {
                     } else if card_game_shared_state.phase_index == 2 {
                         match input {
                             Input::ArrowUp | Input::ArrowDown => {
-                                if game_main_state.is_card_use_confirm_opened {
+                                if game_main_state.is_card_use_confirm_opened
+                                    || game_main_state.is_card_use_skip_confirm_opened
+                                {
                                     game_main_state.renderers[1].cursor.consume(input);
                                 } else {
                                     let player_index = card_game_shared_state.own_player_index;
@@ -212,6 +232,25 @@ impl GameMainState {
                                     game_main_state.is_card_use_confirm_opened = false;
                                     game_main_state.renderers[1].hide();
                                     game_main_state.renderers[1].cursor.reset();
+                                } else if game_main_state.is_card_use_skip_confirm_opened {
+                                    if game_main_state.renderers[1].cursor.chose_index == 0 {
+                                        to_send_channel_messages.push(
+                                            serde_json::to_string(&UseCardMessage {
+                                                turn: card_game_shared_state.turn,
+                                                check_is_blocked: false,
+                                                player_index: card_game_shared_state
+                                                    .own_player_index,
+                                                use_card_index: 0,
+                                                is_skipped: true,
+                                                args_i32: vec![],
+                                                args_usize: vec![],
+                                            })
+                                            .unwrap(),
+                                        );
+                                    }
+                                    game_main_state.is_card_use_skip_confirm_opened = false;
+                                    game_main_state.renderers[1].hide();
+                                    game_main_state.renderers[1].cursor.reset();
                                 } else {
                                     let player_index = card_game_shared_state.own_player_index;
                                     let cursor_index =
@@ -228,6 +267,23 @@ impl GameMainState {
                                         .as_str(),
                                     );
                                     game_main_state.is_card_use_confirm_opened = true;
+                                }
+                            }
+                            Input::Cancel => {
+                                if game_main_state.is_card_use_confirm_opened
+                                    || game_main_state.is_card_use_skip_confirm_opened
+                                {
+                                    game_main_state.is_card_use_confirm_opened = false;
+                                    game_main_state.is_card_use_skip_confirm_opened = false;
+                                    game_main_state.renderers[1].hide();
+                                    game_main_state.renderers[1].cursor.reset();
+                                } else {
+                                    game_main_state.renderers[1].render(
+                                        vec!["はい".to_string(), "いいえ".to_string()],
+                                        vec![],
+                                        "アイテム使用をスキップしますか？",
+                                    );
+                                    game_main_state.is_card_use_skip_confirm_opened = true;
                                 }
                             }
                             _ => {}
@@ -300,12 +356,14 @@ impl GameMainState {
                             } else if let Ok(message) =
                                 serde_json::from_str::<UseCardMessage>(&message.message)
                             {
-                                let card = card_game_shared_state.players
-                                    [card_game_shared_state.own_player_index]
-                                    .own_card_list
-                                    .remove(message.use_card_index);
-                                let mut card_use_functions = card.get_use_func();
-                                card_use_functions(card_game_shared_state);
+                                if !message.is_skipped {
+                                    let card = card_game_shared_state.players[message.player_index]
+                                        .own_card_list
+                                        .remove(message.use_card_index);
+                                    let mut card_use_functions =
+                                        card.get_use_func(message.player_index);
+                                    card_use_functions(card_game_shared_state);
+                                }
                                 card_game_shared_state.use_card_history.push(message);
                             } else if let Ok(message) =
                                 serde_json::from_str::<AttackTargetMessage>(&message.message)
@@ -314,6 +372,13 @@ impl GameMainState {
                                     card_game_shared_state.players[message.player_index]
                                         .player_state
                                         .current_money_amount += 1;
+                                    interrupt_animations.push(vec![Animation::create_message(
+                                        format!(
+                                            "{}さんは 1 Moneyを得た",
+                                            card_game_shared_state.players[message.player_index]
+                                                .player_name
+                                        ),
+                                    )])
                                 } else {
                                     let opponent_player_index = (message.player_index + 1)
                                         % card_game_shared_state.players.iter().len();
@@ -344,6 +409,17 @@ impl GameMainState {
                                             .player_state
                                             .current_hp -= damage;
                                     }
+                                    interrupt_animations.push(vec![Animation::create_message(
+                                        format!(
+                                            "{}さんに{}のダメージ（残りHP: {}）",
+                                            card_game_shared_state.players[opponent_player_index]
+                                                .player_name,
+                                            damage,
+                                            card_game_shared_state.players[opponent_player_index]
+                                                .player_state
+                                                .current_hp,
+                                        ),
+                                    )]);
                                 }
                                 card_game_shared_state.attack_target_history.push(message);
                             }
@@ -353,9 +429,15 @@ impl GameMainState {
                     console_log!("start consume");
                     let mut check_result = CheckPhaseCompleteResult::empty();
                     'outer: for player_index in 0..card_game_shared_state.players.len() {
+                        if shared_state.is_matched
+                            && card_game_shared_state.own_player_index != player_index
+                        {
+                            continue;
+                        }
                         card_game_shared_state.own_player_index = player_index;
                         'inner: loop {
-                            check_result = card_game_shared_state.check_phase_complete();
+                            check_result =
+                                card_game_shared_state.check_phase_complete(interrupt_animations);
                             console_log!("check result {}", check_result.is_phase_complete);
                             console_log!("check result {:?}", check_result.next_phase_index);
                             console_log!(
@@ -380,6 +462,12 @@ impl GameMainState {
                             break;
                         }
                     }
+                    if let Some(next_phase_index) = check_result.next_phase_index {
+                        if next_phase_index == 4 {
+                            card_game_shared_state.phase_index = 4;
+                            return;
+                        }
+                    }
                     console_log!(
                         "input required player {}",
                         card_game_shared_state.own_player_index
@@ -392,6 +480,9 @@ impl GameMainState {
                         "next input is... {:?}",
                         check_result.is_required_own_input_for_complete
                     );
+
+                    card_game_shared_state.input_is_guard =
+                        !check_result.is_required_own_input_for_complete.unwrap();
                     let card_names = card_game_shared_state
                         .cards_bid_on
                         .iter()
@@ -409,20 +500,22 @@ impl GameMainState {
                                 [(card_game_shared_state.own_player_index + 1)
                                     % card_game_shared_state.players.len()]
                             .player_name;
-                            game_main_state.renderers[2].render(
-                                vec![
-                                    opponent_player_name.to_owned(),
-                                    "攻撃しない(Money+1)".to_string(),
-                                ],
-                                vec![],
-                                format!(
-                                    "{}さん、攻撃対象を選んでください。",
-                                    card_game_shared_state.players
-                                        [card_game_shared_state.own_player_index]
-                                        .player_name
-                                )
-                                .as_str(),
-                            );
+                            if !card_game_shared_state.input_is_guard {
+                                game_main_state.renderers[2].render(
+                                    vec![
+                                        opponent_player_name.to_owned(),
+                                        "攻撃しない(Money+1)".to_string(),
+                                    ],
+                                    vec![],
+                                    format!(
+                                        "{}さん、攻撃対象を選んでください。",
+                                        card_game_shared_state.players
+                                            [card_game_shared_state.own_player_index]
+                                            .player_name
+                                    )
+                                    .as_str(),
+                                );
+                            }
                         }
                         _ => {}
                     }

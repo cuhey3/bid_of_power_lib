@@ -24,4 +24,6 @@ pub struct State {
     pub interrupt_animations: Vec<Vec<Animation>>,
     pub primitives: Primitives,
     pub references: Rc<RefCell<References>>,
+    pub is_request_matching: bool,
+    pub is_matched: bool,
 }

@@ -12,13 +12,34 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         .get_element_by_id("simple-binder-required-input")
         .unwrap();
     fn required_input_func(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
+        if card_game_shared_state.phase_index == 4 {
+            if card_game_shared_state.players[0].player_state.current_hp > 0 {
+                return format!(
+                    "{}さんの勝利です",
+                    card_game_shared_state.players[0].player_name
+                );
+            } else {
+                return format!(
+                    "{}さんの勝利です",
+                    card_game_shared_state.players[1].player_name
+                );
+            }
+        }
+        if card_game_shared_state.input_is_guard {
+            return format!(
+                "{}さんの入力を待っています...",
+                card_game_shared_state.players[(card_game_shared_state.own_player_index + 1)
+                    % card_game_shared_state.players.len()]
+                .player_name
+            );
+        }
         match card_game_shared_state.phase_index {
             1 => format!(
                 "{}さん、入札してください。上下: 選択　左右: 金額変更　A: 決定",
                 card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
             ),
             2 => format!(
-                "{}さん、使用するアイテムを選んでください。上下: 選択　A: 決定",
+                "{}さん、使用するアイテムを選んでください。上下: 選択　A: 決定　Z: スキップ",
                 card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
             ),
 
@@ -284,6 +305,29 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             use_item_cursor,
         ));
     }
+
+    for n in 0..2 {
+        fn initiative(
+            card_game_shared_state: &mut CardGameSharedState,
+            args_usize: usize,
+        ) -> String {
+            if card_game_shared_state.initiatives_to_player_index[0] == args_usize {
+                "先攻"
+            } else {
+                "後攻"
+            }
+            .to_string()
+        }
+        binds.push(SimpleBinder::new(
+            get_element_by_id(format!(
+                "simple-binder-initiative-{}",
+                if n == 0 { "a" } else { "b" }
+            )),
+            n,
+            initiative,
+        ));
+    }
+    // simple-binder-initiative-a
     fn bid_cursor(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
         if card_game_shared_state.phase_index == 1 {
             "👉".to_string()

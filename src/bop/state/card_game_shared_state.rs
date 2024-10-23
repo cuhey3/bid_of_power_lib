@@ -7,12 +7,6 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen_test::console_log;
 
 pub struct CardGameSharedState {
-    // pub treasure_box_opened: Vec<Vec<usize>>,
-    // pub save_data: SaveData,
-    // pub characters: Vec<Character>,
-
-    // ここからカードゲーム用
-    pub is_online: bool,
     pub players: Vec<CardGamePlayer>,
     pub own_player_index: usize,
     pub cards_bid_on: Vec<Card>,
@@ -37,6 +31,7 @@ pub struct CardGameSharedState {
     pub phase_index: usize,
     pub phases: Vec<Phase>,
     pub simple_binders: Vec<SimpleBinder>,
+    pub input_is_guard: bool,
 }
 
 pub struct CardGamePlayer {
@@ -283,7 +278,8 @@ impl AttackTargetMessage {
 #[derive(Debug)]
 pub struct Phase {
     pub phase_type: PhaseType,
-    pub check_phase_complete_func: fn(&mut CardGameSharedState) -> CheckPhaseCompleteResult,
+    pub check_phase_complete_func:
+        fn(&mut CardGameSharedState, &mut Vec<Vec<Animation>>) -> CheckPhaseCompleteResult,
     pub args_usize: Vec<usize>,
 }
 
@@ -315,7 +311,10 @@ pub enum PhaseType {
 
 impl Phase {
     pub fn empty() -> Phase {
-        fn empty_func(_: &mut CardGameSharedState) -> CheckPhaseCompleteResult {
+        fn empty_func(
+            _: &mut CardGameSharedState,
+            _: &mut Vec<Vec<Animation>>,
+        ) -> CheckPhaseCompleteResult {
             CheckPhaseCompleteResult {
                 is_phase_complete: false,
                 next_phase_index: None,
@@ -323,7 +322,7 @@ impl Phase {
             }
         }
         Phase {
-            phase_type: PhaseType::Empty,
+            phase_type: Empty,
             check_phase_complete_func: empty_func,
             args_usize: vec![],
         }
@@ -342,31 +341,27 @@ impl Phase {
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_game_start_phase_complete_func(
             game_state: &mut CardGameSharedState,
+            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
-            console_log!("cgspcf 1");
             let mut result = CheckPhaseCompleteResult {
                 is_phase_complete: false,
                 next_phase_index: None,
-                is_required_own_input_for_complete: None,
+                is_required_own_input_for_complete: Some(false),
             };
-            console_log!("cgspcf 2");
+            // 全員受信が難しいので誰か受信でOK
             result.is_phase_complete = game_state
                 .players
                 .iter()
-                .all(|player| player.game_start_is_approved);
-            console_log!("cgspcf 3");
+                .find(|player| player.game_start_is_approved)
+                .is_some();
 
             if result.is_phase_complete {
                 result.next_phase_index = Some(Bid as i32 as usize);
-                console_log!("cgspcf 4");
             } else {
-                console_log!("cgspcf 5");
-
                 // 自分が approved でなければいつでも入力可能
                 result.is_required_own_input_for_complete =
                     Some(!game_state.players[game_state.own_player_index].game_start_is_approved);
             }
-            console_log!("cgspcf 6");
             result
         }
         Phase {
@@ -380,6 +375,7 @@ impl Phase {
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_bid_phase_complete_func(
             game_state: &mut CardGameSharedState,
+            interrupt_animations: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult {
                 is_phase_complete: false,
@@ -440,6 +436,33 @@ impl Phase {
                 .iter()
                 .all(|flag| *flag == false);
             if result.is_phase_complete {
+                // イニシアチブの入れ替え
+                // TODO
+                // もっといい位置に移動する
+                // もっとコードをシンプルにする
+                let first_player_last_bid_index =
+                    player_index_to_last_bid_index[game_state.initiatives_to_player_index[0]];
+                let first_player_bid_amount =
+                    game_state.temporary_bid_history[first_player_last_bid_index].bid_amount;
+                let second_player_last_bid_index =
+                    player_index_to_last_bid_index[game_state.initiatives_to_player_index[1]];
+                let second_player_bid_amount =
+                    game_state.temporary_bid_history[second_player_last_bid_index].bid_amount;
+                if second_player_bid_amount >= first_player_bid_amount {
+                    let new_first_player = game_state.initiatives_to_player_index[1];
+                    let new_second_player = game_state.initiatives_to_player_index[0];
+                    game_state.initiatives_to_player_index[0] = new_first_player;
+                    game_state.initiatives_to_player_index[1] = new_second_player;
+                    interrupt_animations.push(vec![Animation::create_message(format!(
+                        "落札金額により行動順が変更されました。あなたは {} です",
+                        if new_first_player == game_state.own_player_index {
+                            "先攻"
+                        } else {
+                            "後攻"
+                        }
+                    ))])
+                }
+
                 // 引き続き Bid フェーズを行うかの判定
                 let is_continuous_bid = game_state.players[0].own_card_list.len() < 2;
                 // まだカード使用フェーズが来ないなら引き続き Bid、そうでないなら UseCard
@@ -496,6 +519,7 @@ impl Phase {
 
         fn check_use_card_complete_func(
             game_state: &mut CardGameSharedState,
+            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult {
                 is_phase_complete: false,
@@ -572,6 +596,7 @@ impl Phase {
 
         fn check_attack_target_complete_func(
             game_state: &mut CardGameSharedState,
+            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult {
                 is_phase_complete: false,
@@ -631,6 +656,8 @@ impl Phase {
                 .all(|flag| *flag)
             {
                 result.is_phase_complete = true;
+                result.is_required_own_input_for_complete =
+                    Some(game_state.initiatives_to_player_index[0] == own_player_index);
                 if game_state.cards_bid_on.is_empty() {
                     game_state.turn += 1;
                     if game_state.players[0].own_card_list.is_empty() {
@@ -661,15 +688,34 @@ impl Phase {
             args_usize: vec![],
         }
     }
+
+    pub fn get_game_end_phase() -> Phase {
+        fn check_game_end_complete_func(
+            _: &mut CardGameSharedState,
+            _: &mut Vec<Vec<Animation>>,
+        ) -> CheckPhaseCompleteResult {
+            CheckPhaseCompleteResult {
+                is_phase_complete: true,
+                next_phase_index: None,
+                is_required_own_input_for_complete: None,
+            }
+        }
+        Phase {
+            phase_type: GameEnd,
+            check_phase_complete_func: check_game_end_complete_func,
+            args_usize: vec![],
+        }
+    }
 }
 
 impl CardGameSharedState {
-    pub fn check_phase_complete(&mut self) -> CheckPhaseCompleteResult {
-        console_log!("cpc 1");
+    pub fn check_phase_complete(
+        &mut self,
+        interrupt_animations: &mut Vec<Vec<Animation>>,
+    ) -> CheckPhaseCompleteResult {
         let index = self.phase_index;
         let check_func = self.phases[index].check_phase_complete_func;
-        console_log!("cpc 2");
-        check_func(self)
+        check_func(self, interrupt_animations)
     }
     pub fn phase_shift_to(&mut self, _: &mut Vec<Vec<Animation>>, next_phase_index: usize) {
         let now_phase_index = self.phase_index;
@@ -774,37 +820,3 @@ impl CardGameSharedState {
         self.phase_index = self.phases[next_phase_index].phase_type.to_owned() as i32 as usize;
     }
 }
-// 使わないimpl
-// impl CardGameSharedState {
-//     pub fn update_save_data(shared_state: &mut State) {
-//         if let StateType::BoPShared(rpg_shared_state) = &mut shared_state.state_type {
-//             rpg_shared_state.save_data.update(
-//                 &mut rpg_shared_state.characters,
-//                 &rpg_shared_state.treasure_box_opened,
-//                 shared_state.primitives.map_index,
-//             );
-//         }
-//     }
-//     pub fn load_save_data(shared_state: &mut State) {
-//         if let StateType::BoPShared(rpg_shared_state) = &mut shared_state.state_type {
-//             rpg_shared_state
-//                 .save_data
-//                 .load(&mut rpg_shared_state.characters, true);
-//             rpg_shared_state.treasure_box_opened =
-//                 rpg_shared_state.save_data.treasure_box_usize.to_vec();
-//             shared_state.primitives.map_index =
-//                 *rpg_shared_state.save_data.map_usize.get(0).unwrap();
-//             shared_state.primitives.requested_map_index =
-//                 *rpg_shared_state.save_data.map_usize.get(0).unwrap();
-//         }
-//     }
-//     pub fn new_game(shared_state: &mut State) {
-//         if let StateType::BoPShared(rpg_shared_state) = &mut shared_state.state_type {
-//             let mut new_save_data = SaveData::empty();
-//             new_save_data.load(&mut rpg_shared_state.characters, false);
-//             rpg_shared_state.treasure_box_opened = new_save_data.treasure_box_usize.to_vec();
-//             shared_state.primitives.map_index = *new_save_data.map_usize.get(0).unwrap();
-//             shared_state.primitives.requested_map_index = *new_save_data.map_usize.get(0).unwrap();
-//         }
-//     }
-// }

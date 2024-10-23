@@ -1,6 +1,6 @@
 use crate::engine::application_types::StateType::BoPShared;
 use crate::features::animation::Animation;
-use crate::features::websocket::{ChannelMessage, WebSocketWrapper};
+use crate::features::websocket::{ChannelMessage, MessageType, WebSocketWrapper};
 use input::Input;
 use scene::Scene;
 use state::State;
@@ -81,10 +81,14 @@ impl Engine {
         );
         let scene_index = self.shared_state.primitives.scene_index;
         if scene_index != 0 && !self.web_socket_wrapper.state.borrow_mut().is_joined {
-            self.web_socket_wrapper.join();
+            // TODO
+            // 対戦用のWebSocketに切り替えると、タイミング的にメッセージ送信が失敗する
+            // self.web_socket_wrapper.join();
         }
         if scene_index == 0 && self.web_socket_wrapper.state.borrow_mut().is_joined {
-            self.web_socket_wrapper.left();
+            // TODO
+            // 対戦用のWebSocketに切り替えると、タイミング的にメッセージ送信が失敗する
+            // self.web_socket_wrapper.left();
         }
         if !self.scenes[scene_index].is_partial_scene {
             // メニューからタイトルなどもあるので遷移先が is_partial_scene でないなら一括で隠す
@@ -113,19 +117,68 @@ impl Engine {
     }
 
     fn receive_channel_message(&mut self, channel_message: &mut ChannelMessage) {
-        console_log!("rcm 1");
-        let mut message = channel_message.message.to_owned();
-        // TODO
-        // ネストしたJSONの扱い…
-        while let Ok(message_string) = serde_json::from_str::<String>(&message) {
-            message = message_string
+        let message = channel_message.message.to_owned();
+        console_log!("receive_channel_message {}", message);
+        if !self.shared_state.is_request_matching {
+            channel_message.message = message;
+            for scene in self.scenes.iter_mut() {
+                let consume_channel_message_func = scene.consume_channel_message_func;
+                consume_channel_message_func(scene, &mut self.shared_state, &channel_message);
+            }
+            return;
         }
-        channel_message.message = message;
-        for scene in self.scenes.iter_mut() {
-            let consume_channel_message_func = scene.consume_channel_message_func;
-            consume_channel_message_func(scene, &mut self.shared_state, &channel_message);
+        if let Ok(special_message) = serde_json::from_str::<ChannelMessage>(&message) {
+            match special_message.message_type {
+                MessageType::MatchRequest => {
+                    if special_message.user_name != self.shared_state.user_name {
+                        let to_send_message = serde_json::to_string(&ChannelMessage {
+                            user_name: self.shared_state.user_name.to_string(),
+                            message_type: MessageType::MatchResponse,
+                            message: special_message.user_name.clone(),
+                        })
+                        .unwrap();
+                        console_log!("to_send_message {}", to_send_message);
+                        self.shared_state
+                            .to_send_channel_messages
+                            .push(to_send_message);
+                    }
+                    return;
+                }
+                MessageType::MatchResponse => {
+                    if special_message.user_name != self.shared_state.user_name
+                        && special_message.message == self.shared_state.user_name
+                    {
+                        if let BoPShared(card_game_shared_state) = &mut self.shared_state.state_type
+                        {
+                            card_game_shared_state.own_player_index = 0;
+                            console_log!("you are first.");
+                        }
+                    } else if special_message.user_name == self.shared_state.user_name {
+                        if let BoPShared(card_game_shared_state) = &mut self.shared_state.state_type
+                        {
+                            card_game_shared_state.own_player_index = 1;
+                            console_log!("you are second.");
+                        }
+                    } else {
+                        return;
+                    }
+                    console_log!(
+                        "match response {} {}",
+                        special_message.message,
+                        special_message.user_name
+                    );
+                    self.web_socket_wrapper.ws.close().unwrap();
+                    self.web_socket_wrapper.state.borrow_mut().channel_name =
+                        format!("bop-{}", special_message.message);
+                    self.web_socket_wrapper.force_update_not_ready();
+                    self.web_socket_wrapper.request_reconnect();
+                    self.shared_state.is_request_matching = false;
+                    self.shared_state.primitives.requested_scene_index = 1;
+                    self.shared_state.is_matched = true;
+                }
+                _ => {}
+            }
         }
-        console_log!("rcm 2");
     }
 
     pub fn animate(&mut self, step: f64) {

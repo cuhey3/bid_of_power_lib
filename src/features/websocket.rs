@@ -22,12 +22,14 @@ pub struct ChannelMessage {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum MessageType {
     Message,
+    MatchRequest,
+    MatchResponse,
     Join,
     Left,
 }
 #[derive(Clone)]
 pub struct WebSocketWrapper {
-    ws: WebSocket,
+    pub ws: WebSocket,
     pub state: Rc<RefCell<WebSocketState>>,
     pub messages: Rc<RefCell<Vec<ChannelMessage>>>,
     pub user_name: String,
@@ -39,10 +41,11 @@ pub struct WebSocketState {
     pub is_closed: bool,
     pub is_joined: bool,
     pub has_connection_request: bool,
+    pub channel_name: String,
 }
 
 impl WebSocketWrapper {
-    pub fn new(user_name: String) -> WebSocketWrapper {
+    pub fn new(user_name: String, channel_name: String) -> WebSocketWrapper {
         let ws =
             WebSocket::new("https://rust-server-956911707039.asia-northeast1.run.app/ws").unwrap();
         let mut websocket_wrapper = WebSocketWrapper {
@@ -52,6 +55,7 @@ impl WebSocketWrapper {
                 is_closed: false,
                 is_joined: false,
                 has_connection_request: true,
+                channel_name,
             })),
             messages: Rc::new(RefCell::new(vec![])),
             user_name: user_name.to_owned(),
@@ -67,7 +71,7 @@ impl WebSocketWrapper {
             console_log!("websocket connection opened.");
             let channel_user = ChannelUser {
                 user_name: clone.user_name.to_owned(),
-                channel_name: "bop".to_string(),
+                channel_name: state_clone.borrow_mut().channel_name.to_string(),
             };
             clone
                 .ws
@@ -112,6 +116,10 @@ impl WebSocketWrapper {
         self.state.borrow_mut().is_opened && !self.state.borrow_mut().is_closed
     }
 
+    pub fn force_update_not_ready(&mut self) {
+        self.state.borrow_mut().is_opened = false;
+        self.state.borrow_mut().is_closed = true;
+    }
     pub fn is_connecting(&self) -> bool {
         self.state.borrow_mut().has_connection_request
     }
@@ -143,9 +151,7 @@ impl WebSocketWrapper {
             console_log!("websocket connection does not ready...");
             return;
         }
-        self.ws
-            .send_with_str(&serde_json::to_string(&message).unwrap())
-            .unwrap();
+        self.ws.send_with_str(&message.to_string()).unwrap();
     }
 
     // Need to wait for onopen event elsewhere

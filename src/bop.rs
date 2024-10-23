@@ -1,8 +1,7 @@
 use crate::bop::scenes::game_main::GameMainState;
 use crate::bop::state::bind::get_binds;
 use crate::bop::state::card_game_shared_state::{
-    AttackTargetMessage, BidMessage, CardGamePlayer, GameStartIsApprovedMessage, Phase,
-    PlayerState, UseCardMessage,
+    AttackTargetMessage, BidMessage, CardGamePlayer, Phase, PlayerState, UseCardMessage,
 };
 use crate::engine::application_types::StateType;
 use crate::engine::state::{Primitives, References, State};
@@ -27,7 +26,6 @@ pub fn mount() -> Engine {
     let user_name = random_number.to_string();
 
     let rpg_shared_state = CardGameSharedState {
-        is_online: false,
         players: vec![
             CardGamePlayer {
                 player_name: "プレイヤー1".to_string(),
@@ -60,22 +58,11 @@ pub fn mount() -> Engine {
         phase_index: 0,
         phases: Phase::get_phases(),
         simple_binders: get_binds(),
+        input_is_guard: false,
     };
-    let to_send_channel_messages = vec![
-        serde_json::to_string(&GameStartIsApprovedMessage {
-            player_index: 0,
-            game_start_is_approved: true,
-        })
-        .unwrap(),
-        serde_json::to_string(&GameStartIsApprovedMessage {
-            player_index: 1,
-            game_start_is_approved: true,
-        })
-        .unwrap(),
-    ];
     let mut shared_state = State {
         user_name: user_name.to_owned(),
-        to_send_channel_messages,
+        to_send_channel_messages: vec![],
         elements: SharedElements::new(),
         interrupt_animations: vec![vec![Animation::always_blink()]],
         state_type: StateType::BoPShared(rpg_shared_state),
@@ -89,6 +76,8 @@ pub fn mount() -> Engine {
             has_block_message: false,
             has_continuous_message: false,
         })),
+        is_request_matching: false,
+        is_matched: false,
     };
 
     let mut scenes = vec![
@@ -97,6 +86,7 @@ pub fn mount() -> Engine {
     ];
     let init_func = scenes[0].init_func;
     init_func(&mut scenes[0], &mut shared_state);
-    let web_socket_wrapper = WebSocketWrapper::new(shared_state.user_name.to_owned());
+    let web_socket_wrapper =
+        WebSocketWrapper::new(shared_state.user_name.to_owned(), "bop".to_string());
     Engine::new(shared_state, scenes, web_socket_wrapper)
 }
