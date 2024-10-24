@@ -1,7 +1,3 @@
-use crate::bop::state::card_game_shared_state::{
-    AttackTargetMessage, BidMessage, CheckPhaseCompleteResult, GameStartIsApprovedMessage,
-    GameStateMessage, UseCardMessage,
-};
 use crate::engine::application_types::SceneType::BoPGameMain;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::input::Input;
@@ -12,6 +8,8 @@ use crate::features::websocket::{ChannelMessage, MessageType};
 use crate::svg::element_wrapper::ElementWrapper;
 use crate::svg::svg_renderer::{Cursor, SvgRenderer};
 use wasm_bindgen_test::console_log;
+use crate::bop::state::message::{AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, GameStateMessage, UseCardMessage};
+use crate::bop::state::phase::CheckPhaseCompleteResult;
 
 pub struct GameMainState {
     renderers: Vec<SvgRenderer>,

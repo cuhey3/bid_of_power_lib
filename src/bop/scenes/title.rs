@@ -1,4 +1,4 @@
-use crate::bop::state::card_game_shared_state::GameStartIsApprovedMessage;
+use crate::bop::state::message::GameStartIsApprovedMessage;
 use crate::engine::application_types::SceneType::BoPTitle;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::input::Input;

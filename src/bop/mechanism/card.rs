@@ -1,9 +1,8 @@
-use crate::bop::state::card_game_shared_state::CardKind::*;
-use crate::bop::state::card_game_shared_state::{CardGameSharedState, CardKind};
-use rand::prelude::SliceRandom;
 use wasm_bindgen_test::console_log;
+use crate::bop::mechanism::card::CardKind::{ATKSwap, ArmourBreak, Balance, BuildUp, ChainMail, Chaos, Cure, DEFSwap, Dagger, Excalibur, GainUp, GoldenDagger, GoldenHeal, GoldenSkin, HPSwap, LeatherArmour, LongSword, MagicBolt, Shrink, Treasure, Weakness};
+use crate::bop::state::message::CardGameSharedState;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Card {
     pub sold_for: u32,
     pub is_used: bool,
@@ -437,5 +436,85 @@ impl Card {
                 )),
             ])),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CardKind {
+    LongSword,
+    LeatherArmour,
+    Dagger,
+    Balance,
+    Cure,
+    Shrink,
+    ArmourBreak,
+    GainUp,
+    Weakness,
+    ChainMail,
+    MagicBolt,
+    BuildUp,
+    HPSwap,
+    GoldenHeal,
+    Treasure,
+    GoldenSkin,
+    Chaos,
+    GoldenDagger,
+    ATKSwap,
+    DEFSwap,
+    Excalibur,
+}
+
+impl CardKind {
+    pub fn get_card_name(&self) -> String {
+        match self {
+            LongSword => "ロングソード",
+            LeatherArmour => "レザーアーマー",
+            Dagger => "ダガー",
+            Balance => "バランス",
+            Cure => "キュア",
+            Shrink => "シュリンク",
+            ArmourBreak => "アーマーブレイク",
+            GainUp => "ゲインアップ",
+            Weakness => "ウィークネス",
+            ChainMail => "チェインメイル",
+            MagicBolt => "マジックボルト",
+            BuildUp => "ビルドアップ",
+            HPSwap => "HPスワップ",
+            GoldenHeal => "ゴールデンヒール",
+            Treasure => "トレジャー",
+            GoldenSkin => "ゴールデンスキン",
+            Chaos => "カオス",
+            GoldenDagger => "ゴールデンダガー",
+            ATKSwap => "ATKスワップ",
+            DEFSwap => "DEFスワップ",
+            Excalibur => "エクスカリバー",
+        }
+        .to_string()
+    }
+    pub fn get_card_description(&self) -> String {
+        match self {
+            LongSword => "自己ATK+10",
+            LeatherArmour => "自己DEF+5",
+            Dagger => "自己ATK+5",
+            Balance => "自己ATK,DEFを高い方に合わせ+1",
+            Cure => "自己HP+20",
+            Shrink => "相手ATK,DEFを低い方に合わせ-1",
+            ArmourBreak => "相手DEF半減",
+            GainUp => "自己獲得Money+1",
+            Weakness => "相手ATK半減",
+            ChainMail => "自己DEF+10",
+            MagicBolt => "相手HP-15",
+            BuildUp => "自己MHP+10,HP+10",
+            HPSwap => "お互いのMHP,HPを入れ替える",
+            GoldenHeal => "自己HP+自己現在Money×2",
+            Treasure => "自己Money+5",
+            GoldenSkin => "自己DEF+自己現在Money",
+            Chaos => "全員HP-5,ATK+5,DEF-5",
+            GoldenDagger => "自己ATK+自己現在Money",
+            ATKSwap => "お互いのATKを入れ替える",
+            DEFSwap => "お互いのDEFを入れ替える",
+            Excalibur => "自己HP+10,ATK+10,DEF+10",
+        }
+        .to_string()
     }
 }

@@ -8,7 +8,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_test::console_log;
 
 pub mod application_types;
-pub mod choice;
 pub mod input;
 pub mod scene;
 pub mod state;

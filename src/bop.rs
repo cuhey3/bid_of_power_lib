@@ -1,8 +1,6 @@
 use crate::bop::scenes::game_main::GameMainState;
 use crate::bop::state::bind::get_binds;
-use crate::bop::state::card_game_shared_state::{
-    AttackTargetMessage, BidMessage, CardGamePlayer, Phase, PlayerState, UseCardMessage,
-};
+use crate::bop::state::card_game_shared_state::CardGamePlayer;
 use crate::engine::application_types::StateType;
 use crate::engine::state::{Primitives, References, State};
 use crate::engine::Engine;
@@ -12,9 +10,12 @@ use crate::svg::SharedElements;
 use mechanism::card::Card;
 use rand::Rng;
 use scenes::title::TitleState;
-use state::card_game_shared_state::CardGameSharedState;
+use state::message::CardGameSharedState;
 use std::cell::RefCell;
 use std::rc::Rc;
+use mechanism::player_state::PlayerState;
+use state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
+use state::phase::Phase;
 
 pub mod mechanism;
 pub mod scenes;
