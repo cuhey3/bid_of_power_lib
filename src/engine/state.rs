@@ -26,4 +26,5 @@ pub struct State {
     pub references: Rc<RefCell<References>>,
     pub is_request_matching: bool,
     pub is_matched: bool,
+    pub keep_connection_request: bool,
 }

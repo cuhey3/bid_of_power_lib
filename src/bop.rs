@@ -59,6 +59,8 @@ pub fn mount() -> Engine {
         phases: Phase::get_phases(),
         simple_binders: get_binds(),
         input_is_guard: false,
+        seq_no_to_send: 0,
+        consumed_seq_no: 0,
     };
     let mut shared_state = State {
         user_name: user_name.to_owned(),
@@ -78,6 +80,7 @@ pub fn mount() -> Engine {
         })),
         is_request_matching: false,
         is_matched: false,
+        keep_connection_request: false,
     };
 
     let mut scenes = vec![

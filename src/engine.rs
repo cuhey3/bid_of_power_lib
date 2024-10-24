@@ -182,6 +182,12 @@ impl Engine {
     }
 
     pub fn animate(&mut self, step: f64) {
+        if self.shared_state.keep_connection_request {
+            if !self.web_socket_wrapper.is_ready() {
+                self.web_socket_wrapper.request_reconnect();
+            }
+            self.shared_state.keep_connection_request = false;
+        }
         // 送るべきメッセージが存在していてWebSocketが切れていれば再接続
         if !self.web_socket_wrapper.is_ready()
             && !self.shared_state.to_send_channel_messages.is_empty()

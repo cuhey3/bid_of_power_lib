@@ -46,7 +46,7 @@ impl Card {
         .into_iter()
         .map(|card_kind| Card::from(card_kind))
         .collect::<Vec<Card>>();
-        cards.shuffle(&mut rng);
+        // cards.shuffle(&mut rng);
         cards.push(Card::from(Excalibur));
         cards
     }

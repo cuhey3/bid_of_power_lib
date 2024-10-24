@@ -1,6 +1,6 @@
 use crate::bop::state::card_game_shared_state::{
     AttackTargetMessage, BidMessage, CheckPhaseCompleteResult, GameStartIsApprovedMessage,
-    UseCardMessage,
+    GameStateMessage, UseCardMessage,
 };
 use crate::engine::application_types::SceneType::BoPGameMain;
 use crate::engine::application_types::StateType::BoPShared;
@@ -96,6 +96,7 @@ impl GameMainState {
     }
     pub fn create_consume_func(&self) -> fn(&mut Scene, &mut State, Input) {
         fn consume_func(scene: &mut Scene, shared_state: &mut State, input: Input) {
+            shared_state.keep_connection_request = true;
             if let State {
                 state_type: BoPShared(card_game_shared_state),
                 to_send_channel_messages,
@@ -164,6 +165,7 @@ impl GameMainState {
                                     if game_main_state.renderers[1].cursor.chose_index == 0 {
                                         to_send_channel_messages.push(
                                             serde_json::to_string(&BidMessage {
+                                                seq_no: card_game_shared_state.get_seq_no_to_send(),
                                                 player_index: card_game_shared_state
                                                     .own_player_index,
                                                 bid_card_index: cursor_index,
@@ -237,6 +239,7 @@ impl GameMainState {
                                         game_main_state.use_item_cursors[player_index].reset();
                                         to_send_channel_messages.push(
                                             serde_json::to_string(&UseCardMessage {
+                                                seq_no: card_game_shared_state.get_seq_no_to_send(),
                                                 turn: card_game_shared_state.turn,
                                                 check_is_blocked: false,
                                                 player_index: card_game_shared_state
@@ -256,6 +259,7 @@ impl GameMainState {
                                     if game_main_state.renderers[1].cursor.chose_index == 0 {
                                         to_send_channel_messages.push(
                                             serde_json::to_string(&UseCardMessage {
+                                                seq_no: card_game_shared_state.get_seq_no_to_send(),
                                                 turn: card_game_shared_state.turn,
                                                 check_is_blocked: false,
                                                 player_index: card_game_shared_state
@@ -320,6 +324,7 @@ impl GameMainState {
                                 let is_skipped =
                                     game_main_state.renderers[2].cursor.chose_index == 1;
                                 let attack_target_message = AttackTargetMessage {
+                                    seq_no: card_game_shared_state.get_seq_no_to_send(),
                                     turn: card_game_shared_state.turn,
                                     player_index,
                                     check_is_blocked: false,
@@ -359,8 +364,74 @@ impl GameMainState {
                 } = shared_state
                 {
                     match message.message_type {
+                        MessageType::Join => {
+                            if message.user_name == shared_state.user_name {
+                                console_log!("own reconnection");
+                            } else {
+                                shared_state.to_send_channel_messages.push(
+                                    serde_json::to_string(&GameStateMessage {
+                                        player_index: card_game_shared_state.own_player_index,
+                                        last_consumed_seq_no: card_game_shared_state
+                                            .consumed_seq_no,
+                                    })
+                                    .unwrap(),
+                                )
+                            }
+                        }
                         MessageType::Message => {
                             if let Ok(message) =
+                                serde_json::from_str::<GameStateMessage>(&message.message)
+                            {
+                                if message.player_index == card_game_shared_state.phase_index
+                                    || card_game_shared_state.consumed_seq_no
+                                        == message.last_consumed_seq_no
+                                {
+                                    // 自分のメッセージ、または同期が取れているものは無視
+                                    // empty
+                                } else {
+                                    let last_consumed = card_game_shared_state.consumed_seq_no;
+                                    for n in last_consumed + 1
+                                        ..card_game_shared_state.consumed_seq_no + 1
+                                    {
+                                        if let Some(found) = card_game_shared_state
+                                            .temporary_bid_history
+                                            .iter()
+                                            .find(|message| message.seq_no == n)
+                                        {
+                                            shared_state
+                                                .to_send_channel_messages
+                                                .push(serde_json::to_string(found).unwrap());
+                                        };
+                                        if let Some(found) = card_game_shared_state
+                                            .bid_history
+                                            .iter()
+                                            .find(|message| message.seq_no == n)
+                                        {
+                                            shared_state
+                                                .to_send_channel_messages
+                                                .push(serde_json::to_string(found).unwrap());
+                                        };
+                                        if let Some(found) = card_game_shared_state
+                                            .use_card_history
+                                            .iter()
+                                            .find(|message| message.seq_no == n)
+                                        {
+                                            shared_state
+                                                .to_send_channel_messages
+                                                .push(serde_json::to_string(found).unwrap());
+                                        };
+                                        if let Some(found) = card_game_shared_state
+                                            .attack_target_history
+                                            .iter()
+                                            .find(|message| message.seq_no == n)
+                                        {
+                                            shared_state
+                                                .to_send_channel_messages
+                                                .push(serde_json::to_string(found).unwrap());
+                                        };
+                                    }
+                                }
+                            } else if let Ok(message) =
                                 serde_json::from_str::<GameStartIsApprovedMessage>(&message.message)
                             {
                                 card_game_shared_state.players[message.player_index]
@@ -368,6 +439,10 @@ impl GameMainState {
                             } else if let Ok(message) =
                                 serde_json::from_str::<BidMessage>(&message.message)
                             {
+                                card_game_shared_state.check_and_update_seq_no(
+                                    message.seq_no,
+                                    message.player_index == card_game_shared_state.own_player_index,
+                                );
                                 card_game_shared_state.temporary_bid_history.push(message);
                                 BidMessage::ready_bid_input(
                                     &mut card_game_shared_state.bid_input,
@@ -376,6 +451,10 @@ impl GameMainState {
                             } else if let Ok(message) =
                                 serde_json::from_str::<UseCardMessage>(&message.message)
                             {
+                                card_game_shared_state.check_and_update_seq_no(
+                                    message.seq_no,
+                                    message.player_index == card_game_shared_state.own_player_index,
+                                );
                                 if !message.is_skipped {
                                     let card = card_game_shared_state.players[message.player_index]
                                         .own_card_list
@@ -388,6 +467,10 @@ impl GameMainState {
                             } else if let Ok(message) =
                                 serde_json::from_str::<AttackTargetMessage>(&message.message)
                             {
+                                card_game_shared_state.check_and_update_seq_no(
+                                    message.seq_no,
+                                    message.player_index == card_game_shared_state.own_player_index,
+                                );
                                 if message.is_skipped {
                                     card_game_shared_state.players[message.player_index]
                                         .player_state

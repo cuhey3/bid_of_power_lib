@@ -32,6 +32,8 @@ pub struct CardGameSharedState {
     pub phases: Vec<Phase>,
     pub simple_binders: Vec<SimpleBinder>,
     pub input_is_guard: bool,
+    pub seq_no_to_send: usize,
+    pub consumed_seq_no: usize,
 }
 
 pub struct CardGamePlayer {
@@ -158,11 +160,6 @@ impl CardKind {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct BattleIsViewedMessage {
-    pub battle_is_viewed: bool,
-}
-
-#[derive(Deserialize, Serialize)]
 pub struct GameStartIsApprovedMessage {
     pub player_index: usize,
     pub game_start_is_approved: bool,
@@ -170,6 +167,7 @@ pub struct GameStartIsApprovedMessage {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BidMessage {
+    pub seq_no: usize,
     pub player_index: usize,
     pub bid_card_index: usize,
     pub bid_amount: u32,
@@ -178,6 +176,7 @@ pub struct BidMessage {
 impl BidMessage {
     pub fn init() -> BidMessage {
         BidMessage {
+            seq_no: 0,
             player_index: 0,
             bid_card_index: 0,
             bid_amount: 1,
@@ -222,6 +221,7 @@ impl BidMessage {
 }
 #[derive(Deserialize, Serialize)]
 pub struct UseCardMessage {
+    pub seq_no: usize,
     pub turn: usize,
     // 1度のターンで複数のカードを使うことができるように用意したフラグ
     // 当然ブロックしているユーザーが次のカード使用者である
@@ -236,6 +236,7 @@ pub struct UseCardMessage {
 impl UseCardMessage {
     pub fn new_with_turn(turn: usize) -> UseCardMessage {
         UseCardMessage {
+            seq_no: 0,
             turn,
             check_is_blocked: false,
             player_index: 0,
@@ -252,6 +253,7 @@ impl UseCardMessage {
 
 #[derive(Deserialize, Serialize)]
 pub struct AttackTargetMessage {
+    pub seq_no: usize,
     pub turn: usize,
     pub player_index: usize,
     // 1度のターンで複数回攻撃決定ができるように用意したフラグ
@@ -264,6 +266,7 @@ pub struct AttackTargetMessage {
 impl AttackTargetMessage {
     pub fn new_with_turn(turn: usize) -> AttackTargetMessage {
         AttackTargetMessage {
+            seq_no: 0,
             turn,
             player_index: 0,
             check_is_blocked: false,
@@ -275,6 +278,13 @@ impl AttackTargetMessage {
         AttackTargetMessage::new_with_turn(0)
     }
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct GameStateMessage {
+    pub player_index: usize,
+    pub last_consumed_seq_no: usize,
+}
+
 #[derive(Debug)]
 pub struct Phase {
     pub phase_type: PhaseType,
@@ -709,6 +719,34 @@ impl Phase {
 }
 
 impl CardGameSharedState {
+    pub fn get_seq_no_to_send(&mut self) -> usize {
+        self.seq_no_to_send += 1;
+        self.seq_no_to_send
+    }
+
+    fn is_valid_new_message(&self, message_seq_no: usize) -> bool {
+        message_seq_no + 1 == self.consumed_seq_no
+    }
+    fn update_consumed_seq_no(&mut self, message_seq_no: usize) {
+        self.consumed_seq_no = message_seq_no;
+    }
+
+    pub fn check_and_update_seq_no(&mut self, seq_no: usize, own_message_flag: bool) {
+        if !self.is_valid_new_message(seq_no) {
+            if own_message_flag {
+                // 自分の再送信メッセージなので無視
+                return;
+            }
+            console_log!(
+                "message seq no does not match {} and {}",
+                seq_no,
+                self.consumed_seq_no
+            );
+            panic!()
+        }
+        self.update_consumed_seq_no(seq_no);
+        return;
+    }
     pub fn check_phase_complete(
         &mut self,
         interrupt_animations: &mut Vec<Vec<Animation>>,
