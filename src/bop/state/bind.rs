@@ -334,6 +334,9 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             let opponent_player_state = &card_game_shared_state.players
                 [(args_usize + 1) % card_game_shared_state.players.len()]
             .player_state;
+            if opponent_player_state.attack_point == 0 {
+                return 0.to_string();
+            }
             (opponent_player_state.attack_point as i32 - own_player_state.defence_point as i32)
                 .max(1)
                 .to_string()

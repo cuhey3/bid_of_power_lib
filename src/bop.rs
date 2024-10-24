@@ -59,7 +59,6 @@ pub fn mount() -> Engine {
         phases: Phase::get_phases(),
         simple_binders: get_binds(),
         input_is_guard: false,
-        seq_no_to_send: 0,
         consumed_seq_no: 0,
     };
     let mut shared_state = State {

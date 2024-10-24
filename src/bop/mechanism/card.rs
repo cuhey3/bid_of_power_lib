@@ -65,18 +65,20 @@ impl Card {
             };
             let state = &mut card_game_shared_state.players[target_player_index].player_state;
             match status.as_str() {
-                "ATK" => state.attack_point = (state.attack_point as i32 + amount) as u32,
-                "DEF" => state.defence_point = (state.defence_point as i32 + amount) as u32,
+                "ATK" => state.attack_point = (state.attack_point as i32 + amount).max(0) as u32,
+                "DEF" => state.defence_point = (state.defence_point as i32 + amount).max(0) as u32,
                 "HP" => {
-                    state.current_hp = ((state.current_hp as i32 + amount) as u32).min(state.max_hp)
+                    state.current_hp =
+                        ((state.current_hp as i32 + amount).max(0) as u32).min(state.max_hp)
                 }
-                "MHP" => state.max_hp = (state.max_hp as i32 + amount) as u32,
+                "MHP" => state.max_hp = (state.max_hp as i32 + amount).max(0) as u32,
                 "Money" => {
-                    state.current_money_amount = (state.current_money_amount as i32 + amount) as u32
+                    state.current_money_amount =
+                        (state.current_money_amount as i32 + amount).max(0) as u32
                 }
                 "Gain" => {
                     state.estimated_money_amount =
-                        (state.estimated_money_amount as i32 + amount) as u32
+                        (state.estimated_money_amount as i32 + amount).max(0) as u32
                 }
                 _ => {
                     panic!()
@@ -99,14 +101,22 @@ impl Card {
             };
             let state = &mut card_game_shared_state.players[target_player_index].player_state;
             match status.as_str() {
-                "ATK" => state.attack_point += (state.current_money_amount as f64 * scale) as u32,
-                "DEF" => state.defence_point += (state.current_money_amount as f64 * scale) as u32,
+                "ATK" => {
+                    state.attack_point +=
+                        (state.current_money_amount as f64 * scale).max(0.0) as u32
+                }
+                "DEF" => {
+                    state.defence_point +=
+                        (state.current_money_amount as f64 * scale).max(0.0) as u32
+                }
                 "HP" => {
                     state.current_hp = (state.current_hp
-                        + (state.current_money_amount as f64 * scale) as u32)
+                        + (state.current_money_amount as f64 * scale).max(0.0) as u32)
                         .min(state.max_hp)
                 }
-                "MHP" => state.max_hp += (state.current_money_amount as f64 * scale) as u32,
+                "MHP" => {
+                    state.max_hp += (state.current_money_amount as f64 * scale).max(0.0) as u32
+                }
                 _ => {
                     panic!()
                 }
@@ -211,24 +221,34 @@ impl Card {
             };
             match status_a.as_str() {
                 "HP" => {
-                    target_player_status.current_hp =
-                        ((new_amount as i32 + modifier) as u32).min(target_player_status.max_hp)
+                    target_player_status.current_hp = ((new_amount as i32 + modifier).max(0) as u32)
+                        .min(target_player_status.max_hp)
                 }
-                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier) as u32,
-                "ATK" => target_player_status.attack_point = (new_amount as i32 + modifier) as u32,
-                "DEF" => target_player_status.defence_point = (new_amount as i32 + modifier) as u32,
+                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier).max(0) as u32,
+                "ATK" => {
+                    target_player_status.attack_point = (new_amount as i32 + modifier).max(0) as u32
+                }
+                "DEF" => {
+                    target_player_status.defence_point =
+                        (new_amount as i32 + modifier).max(0) as u32
+                }
                 _ => {
                     panic!()
                 }
             };
             match status_b.as_str() {
                 "HP" => {
-                    target_player_status.current_hp =
-                        ((new_amount as i32 + modifier) as u32).min(target_player_status.max_hp)
+                    target_player_status.current_hp = ((new_amount as i32 + modifier).max(0) as u32)
+                        .min(target_player_status.max_hp)
                 }
-                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier) as u32,
-                "ATK" => target_player_status.attack_point = (new_amount as i32 + modifier) as u32,
-                "DEF" => target_player_status.defence_point = (new_amount as i32 + modifier) as u32,
+                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier).max(0) as u32,
+                "ATK" => {
+                    target_player_status.attack_point = (new_amount as i32 + modifier).max(0) as u32
+                }
+                "DEF" => {
+                    target_player_status.defence_point =
+                        (new_amount as i32 + modifier).max(0) as u32
+                }
                 _ => {
                     panic!()
                 }

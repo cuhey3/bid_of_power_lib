@@ -32,7 +32,6 @@ pub struct CardGameSharedState {
     pub phases: Vec<Phase>,
     pub simple_binders: Vec<SimpleBinder>,
     pub input_is_guard: bool,
-    pub seq_no_to_send: usize,
     pub consumed_seq_no: usize,
 }
 
@@ -159,7 +158,7 @@ impl CardKind {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GameStartIsApprovedMessage {
     pub player_index: usize,
     pub game_start_is_approved: bool,
@@ -219,7 +218,7 @@ impl BidMessage {
         }
     }
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct UseCardMessage {
     pub seq_no: usize,
     pub turn: usize,
@@ -251,7 +250,7 @@ impl UseCardMessage {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct AttackTargetMessage {
     pub seq_no: usize,
     pub turn: usize,
@@ -279,7 +278,7 @@ impl AttackTargetMessage {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GameStateMessage {
     pub player_index: usize,
     pub last_consumed_seq_no: usize,
@@ -422,7 +421,7 @@ impl Phase {
                         .iter()
                         .map(|bid| bid.player_index)
                         .collect::<Vec<usize>>();
-                    console_log!("temporary history len >= player len, but index={} player target card not found. input player index: {:?}", player_index, input_player_index);
+                    console_log!("temporary history len >= player len, but index={} player target card not found. input player index: {:?} {:?}", player_index, input_player_index, game_state.temporary_bid_history);
                     panic!()
                 }
                 player_index_to_target_card_index[player_index] = found.unwrap().1.bid_card_index;
@@ -572,9 +571,11 @@ impl Phase {
                     .find(|history| history.player_index == player_index)
                 {
                     player_index_to_card_used_flag[last_history.player_index] = true;
-                };
+                }
+                if game_state.players[player_index].own_card_list.is_empty() {
+                    player_index_to_card_used_flag[player_index] = true;
+                }
             }
-
             // 全員が使用完了
             if player_index_to_card_used_flag.iter().all(|flag| *flag) {
                 result.is_phase_complete = true;
@@ -669,8 +670,9 @@ impl Phase {
                 result.is_required_own_input_for_complete =
                     Some(game_state.initiatives_to_player_index[0] == own_player_index);
                 if game_state.cards_bid_on.is_empty() {
-                    game_state.turn += 1;
-                    if game_state.players[0].own_card_list.is_empty() {
+                    if game_state.players[0].own_card_list.is_empty()
+                        && game_state.players[1].own_card_list.is_empty()
+                    {
                         result.next_phase_index = Some(AttackTarget as i32 as usize);
                     } else {
                         result.next_phase_index = Some(UseCard as i32 as usize);
@@ -719,23 +721,22 @@ impl Phase {
 }
 
 impl CardGameSharedState {
-    pub fn get_seq_no_to_send(&mut self) -> usize {
-        self.seq_no_to_send += 1;
-        self.seq_no_to_send
+    pub fn get_seq_no_to_send(&self) -> usize {
+        self.consumed_seq_no + 1
     }
 
     fn is_valid_new_message(&self, message_seq_no: usize) -> bool {
-        message_seq_no + 1 == self.consumed_seq_no
+        message_seq_no == self.consumed_seq_no + 1
     }
     fn update_consumed_seq_no(&mut self, message_seq_no: usize) {
         self.consumed_seq_no = message_seq_no;
     }
 
-    pub fn check_and_update_seq_no(&mut self, seq_no: usize, own_message_flag: bool) {
+    pub fn check_and_update_seq_no(&mut self, seq_no: usize, own_message_flag: bool) -> bool {
         if !self.is_valid_new_message(seq_no) {
             if own_message_flag {
                 // 自分の再送信メッセージなので無視
-                return;
+                return false;
             }
             console_log!(
                 "message seq no does not match {} and {}",
@@ -745,7 +746,7 @@ impl CardGameSharedState {
             panic!()
         }
         self.update_consumed_seq_no(seq_no);
-        return;
+        true
     }
     pub fn check_phase_complete(
         &mut self,
@@ -806,8 +807,12 @@ impl CardGameSharedState {
                         self.cards_bid_on.push(card);
                     }
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
+                    self.turn += 1;
                 }
                 3 => {
+                    // TODO
+                    // 根本的な解決になっていないが空になっていないことがあるので…
+                    self.temporary_bid_history.clear();
                     self.turn += 1;
                 }
                 _ => {}
@@ -850,6 +855,15 @@ impl CardGameSharedState {
                         self.cards_bid_on.push(card);
                     }
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
+                }
+                3 => {
+                    self.turn += 1;
+                }
+                _ => {}
+            },
+            AttackTarget => match now_phase_index {
+                3 => {
+                    self.turn += 1;
                 }
                 _ => {}
             },

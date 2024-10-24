@@ -365,9 +365,11 @@ impl GameMainState {
                 {
                     match message.message_type {
                         MessageType::Join => {
-                            if message.user_name == shared_state.user_name {
-                                console_log!("own reconnection");
-                            } else {
+                            console_log!("enter join message logic {:?}", message);
+                            if message.user_name == shared_state.user_name
+                                && card_game_shared_state.consumed_seq_no != 0
+                            {
+                                // 自分が復帰したことを相手に知らせる
                                 shared_state.to_send_channel_messages.push(
                                     serde_json::to_string(&GameStateMessage {
                                         player_index: card_game_shared_state.own_player_index,
@@ -377,11 +379,14 @@ impl GameMainState {
                                     .unwrap(),
                                 )
                             }
+                            console_log!("complete join message logic {:?}", message);
                         }
                         MessageType::Message => {
+                            console_log!("enter main message logic {:?}", message);
                             if let Ok(message) =
                                 serde_json::from_str::<GameStateMessage>(&message.message)
                             {
+                                console_log!("enter game state message logic {:?}", message);
                                 if message.player_index == card_game_shared_state.phase_index
                                     || card_game_shared_state.consumed_seq_no
                                         == message.last_consumed_seq_no
@@ -389,7 +394,7 @@ impl GameMainState {
                                     // 自分のメッセージ、または同期が取れているものは無視
                                     // empty
                                 } else {
-                                    let last_consumed = card_game_shared_state.consumed_seq_no;
+                                    let last_consumed = message.last_consumed_seq_no;
                                     for n in last_consumed + 1
                                         ..card_game_shared_state.consumed_seq_no + 1
                                     {
@@ -431,46 +436,69 @@ impl GameMainState {
                                         };
                                     }
                                 }
+                                console_log!("complete game state message logic {:?}", message);
                             } else if let Ok(message) =
                                 serde_json::from_str::<GameStartIsApprovedMessage>(&message.message)
                             {
+                                console_log!(
+                                    "enter game start is approved message logic {:?}",
+                                    message
+                                );
                                 card_game_shared_state.players[message.player_index]
                                     .game_start_is_approved = message.game_start_is_approved;
+                                console_log!(
+                                    "complete game start is approved message logic {:?}",
+                                    message
+                                );
                             } else if let Ok(message) =
                                 serde_json::from_str::<BidMessage>(&message.message)
                             {
-                                card_game_shared_state.check_and_update_seq_no(
+                                console_log!("enter bid message logic {:?}", message);
+                                if !card_game_shared_state.check_and_update_seq_no(
                                     message.seq_no,
                                     message.player_index == card_game_shared_state.own_player_index,
-                                );
+                                ) {
+                                    return;
+                                }
                                 card_game_shared_state.temporary_bid_history.push(message);
                                 BidMessage::ready_bid_input(
                                     &mut card_game_shared_state.bid_input,
                                     &card_game_shared_state.temporary_bid_history,
                                 );
+                                console_log!("complete bid message logic");
                             } else if let Ok(message) =
                                 serde_json::from_str::<UseCardMessage>(&message.message)
                             {
-                                card_game_shared_state.check_and_update_seq_no(
+                                console_log!("enter use card message logic {:?}", message);
+                                if !card_game_shared_state.check_and_update_seq_no(
                                     message.seq_no,
                                     message.player_index == card_game_shared_state.own_player_index,
-                                );
+                                ) {
+                                    return;
+                                }
+                                console_log!("use card logic 1");
                                 if !message.is_skipped {
                                     let card = card_game_shared_state.players[message.player_index]
                                         .own_card_list
                                         .remove(message.use_card_index);
+                                    console_log!("use card logic 2");
                                     let mut card_use_functions =
                                         card.get_use_func(message.player_index);
                                     card_use_functions(card_game_shared_state);
                                 }
+                                console_log!("use card logic 3");
                                 card_game_shared_state.use_card_history.push(message);
+                                console_log!("complete use card message logic");
                             } else if let Ok(message) =
                                 serde_json::from_str::<AttackTargetMessage>(&message.message)
                             {
-                                card_game_shared_state.check_and_update_seq_no(
+                                console_log!("enter attack target message logic {:?}", message);
+                                if !card_game_shared_state.check_and_update_seq_no(
                                     message.seq_no,
                                     message.player_index == card_game_shared_state.own_player_index,
-                                );
+                                ) {
+                                    return;
+                                }
                                 if message.is_skipped {
                                     card_game_shared_state.players[message.player_index]
                                         .player_state
@@ -493,12 +521,13 @@ impl GameMainState {
                                         [message.player_index]
                                         .player_state
                                         .attack_point;
-                                    let damage =
-                                        if opponent_player_defence_point >= player_attack_point {
-                                            1
-                                        } else {
-                                            player_attack_point - opponent_player_defence_point
-                                        };
+                                    let damage = if player_attack_point == 0 {
+                                        0
+                                    } else if opponent_player_defence_point >= player_attack_point {
+                                        1
+                                    } else {
+                                        player_attack_point - opponent_player_defence_point
+                                    };
                                     if damage
                                         >= card_game_shared_state.players[opponent_player_index]
                                             .player_state
@@ -525,11 +554,13 @@ impl GameMainState {
                                     )]);
                                 }
                                 card_game_shared_state.attack_target_history.push(message);
+                                console_log!("complete attack target message logic");
                             }
                         }
                         _ => {}
                     }
-                    console_log!("start consume");
+                    console_log!("complete message logic");
+                    console_log!("start phase check");
                     let mut check_result = CheckPhaseCompleteResult::empty();
                     'outer: for player_index in 0..card_game_shared_state.players.len() {
                         if shared_state.is_matched
@@ -552,9 +583,17 @@ impl GameMainState {
                                     console_log!("battle end");
                                     break 'outer;
                                 }
+                                console_log!(
+                                    "phase shift to start, turn: {}",
+                                    card_game_shared_state.turn
+                                );
                                 card_game_shared_state.phase_shift_to(
                                     interrupt_animations,
                                     check_result.next_phase_index.unwrap(),
+                                );
+                                console_log!(
+                                    "phase shift to end, turn:  {}",
+                                    card_game_shared_state.turn
                                 );
                                 game_main_state.renderers[0].cursor.reset();
                             } else {
