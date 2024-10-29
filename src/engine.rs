@@ -53,7 +53,6 @@ impl Engine {
         }
         let scene_index = self.shared_state.primitives.scene_index;
         let consume_func = self.scenes[scene_index].consume_func;
-        console_log!("consume start scene: {:?}", scene_index);
         consume_func(&mut self.scenes[scene_index], &mut self.shared_state, input);
         if !self.has_animation_blocking_scene_update() {
             if self.shared_state.primitives.scene_index

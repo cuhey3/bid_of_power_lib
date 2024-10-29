@@ -8,15 +8,16 @@ use crate::features::animation::Animation;
 use crate::features::websocket::WebSocketWrapper;
 use crate::svg::SharedElements;
 use mechanism::card::Card;
+use mechanism::player_state::PlayerState;
 use rand::Rng;
 use scenes::title::TitleState;
-use state::message::CardGameSharedState;
-use std::cell::RefCell;
-use std::rc::Rc;
-use mechanism::player_state::PlayerState;
+use state::card_game_shared_state::CardGameSharedState;
 use state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use state::phase::Phase;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+mod cpu_player;
 pub mod mechanism;
 pub mod scenes;
 pub mod state;
@@ -45,7 +46,11 @@ pub fn mount() -> Engine {
         ],
         own_player_index: 0,
         cards_bid_on: vec![],
-        bid_input: vec![BidMessage::init(), BidMessage::init(), BidMessage::init()],
+        bid_input: vec![
+            BidMessage::init(0),
+            BidMessage::init(1),
+            BidMessage::init(2),
+        ],
         bid_scheduled_cards: Card::card_set_default(),
         temporary_bid_history: vec![],
         bid_history: vec![],
@@ -61,13 +66,14 @@ pub fn mount() -> Engine {
         simple_binders: get_binds(),
         input_is_guard: false,
         consumed_seq_no: 0,
+        has_cpu: false,
     };
     let mut shared_state = State {
         user_name: user_name.to_owned(),
         to_send_channel_messages: vec![],
         elements: SharedElements::new(),
         interrupt_animations: vec![vec![Animation::always_blink()]],
-        state_type: StateType::BoPShared(rpg_shared_state),
+        state_type: StateType::BoPShared(rpg_shared_state.clone()),
         primitives: Primitives {
             scene_index: 0,
             requested_scene_index: 0,

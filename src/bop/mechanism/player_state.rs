@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PlayerState {
     pub max_hp: u32,
     pub current_hp: u32,

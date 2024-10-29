@@ -1,6 +1,11 @@
+use crate::bop::mechanism::card::CardKind::{
+    ATKSwap, ArmourBreak, Balance, BuildUp, ChainMail, Chaos, Cure, DEFSwap, Dagger, Excalibur,
+    GainUp, GoldenDagger, GoldenHeal, GoldenSkin, HPSwap, LeatherArmour, LongSword, MagicBolt,
+    Shrink, Treasure, Weakness,
+};
+use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use rand::prelude::SliceRandom;
 use wasm_bindgen_test::console_log;
-use crate::bop::mechanism::card::CardKind::{ATKSwap, ArmourBreak, Balance, BuildUp, ChainMail, Chaos, Cure, DEFSwap, Dagger, Excalibur, GainUp, GoldenDagger, GoldenHeal, GoldenSkin, HPSwap, LeatherArmour, LongSword, MagicBolt, Shrink, Treasure, Weakness};
-use crate::bop::state::message::CardGameSharedState;
 
 #[derive(Clone, Debug)]
 pub struct Card {
@@ -45,7 +50,7 @@ impl Card {
         .into_iter()
         .map(|card_kind| Card::from(card_kind))
         .collect::<Vec<Card>>();
-        // cards.shuffle(&mut rng);
+        cards.shuffle(&mut rng);
         cards.push(Card::from(Excalibur));
         cards
     }

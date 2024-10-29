@@ -1,22 +1,18 @@
-use wasm_bindgen_test::console_log;
-use crate::bop::state::message::{AttackTargetMessage, CardGameSharedState, UseCardMessage};
+use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::message::{AttackTargetMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::{AttackTarget, Bid, Empty, GameEnd, GameStart, UseCard};
-use crate::features::animation::Animation;
+use wasm_bindgen_test::console_log;
 
 #[derive(Debug, Clone)]
 pub struct Phase {
     pub phase_type: PhaseType,
-    pub check_phase_complete_func:
-        fn(&mut CardGameSharedState, &mut Vec<Vec<Animation>>) -> CheckPhaseCompleteResult,
+    pub check_phase_complete_func: fn(&mut CardGameSharedState) -> CheckPhaseCompleteResult,
     pub args_usize: Vec<usize>,
 }
 
 impl Phase {
     pub fn empty() -> Phase {
-        fn empty_func(
-            _: &mut CardGameSharedState,
-            _: &mut Vec<Vec<Animation>>,
-        ) -> CheckPhaseCompleteResult {
+        fn empty_func(_: &mut CardGameSharedState) -> CheckPhaseCompleteResult {
             CheckPhaseCompleteResult {
                 is_phase_complete: false,
                 next_phase_index: None,
@@ -43,13 +39,8 @@ impl Phase {
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_game_start_phase_complete_func(
             game_state: &mut CardGameSharedState,
-            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
-            let mut result = CheckPhaseCompleteResult {
-                is_phase_complete: false,
-                next_phase_index: None,
-                is_required_own_input_for_complete: Some(false),
-            };
+            let mut result = CheckPhaseCompleteResult::empty();
             // 全員受信が難しいので誰か受信でOK
             result.is_phase_complete = game_state
                 .players
@@ -77,13 +68,8 @@ impl Phase {
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_bid_phase_complete_func(
             game_state: &mut CardGameSharedState,
-            interrupt_animations: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
-            let mut result = CheckPhaseCompleteResult {
-                is_phase_complete: false,
-                next_phase_index: None,
-                is_required_own_input_for_complete: None,
-            };
+            let mut result = CheckPhaseCompleteResult::empty();
             let temporary_history_len = game_state.temporary_bid_history.len();
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
@@ -155,14 +141,14 @@ impl Phase {
                     let new_second_player = game_state.initiatives_to_player_index[0];
                     game_state.initiatives_to_player_index[0] = new_first_player;
                     game_state.initiatives_to_player_index[1] = new_second_player;
-                    interrupt_animations.push(vec![Animation::create_message(format!(
-                        "落札金額により行動順が変更されました。あなたは {} です",
-                        if new_first_player == game_state.own_player_index {
-                            "先攻"
-                        } else {
-                            "後攻"
-                        }
-                    ))])
+                    // interrupt_animations.push(vec![Animation::create_message(format!(
+                    //     "落札金額により行動順が変更されました。あなたは {} です",
+                    //     if new_first_player == game_state.own_player_index {
+                    //         "先攻"
+                    //     } else {
+                    //         "後攻"
+                    //     }
+                    // ))])
                 }
 
                 // 引き続き Bid フェーズを行うかの判定
@@ -173,8 +159,8 @@ impl Phase {
                 } else {
                     result.next_phase_index = Some(UseCard as i32 as usize);
                 }
-                console_log!("debug...list {:?}", game_state.players[0].own_card_list);
-                console_log!("debug...is_continuous_bid {:?}", is_continuous_bid);
+                // console_log!("debug...list {:?}", game_state.players[0].own_card_list);
+                // console_log!("debug...is_continuous_bid {:?}", is_continuous_bid);
                 return result;
             }
             // 競合が見つかっている場合のロジック
@@ -221,12 +207,16 @@ impl Phase {
 
         fn check_use_card_complete_func(
             game_state: &mut CardGameSharedState,
-            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
-            let mut result = CheckPhaseCompleteResult {
-                is_phase_complete: false,
-                next_phase_index: None,
-                is_required_own_input_for_complete: None,
+            let mut result = CheckPhaseCompleteResult::empty();
+            if let Some(_) = game_state
+                .players
+                .iter()
+                .find(|player| player.player_state.current_hp == 0)
+            {
+                result.is_phase_complete = true;
+                result.next_phase_index = Some(GameEnd as i32 as usize);
+                return result;
             };
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
@@ -297,16 +287,10 @@ impl Phase {
     pub fn get_attack_target_phase() -> Phase {
         // TODO
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
-
         fn check_attack_target_complete_func(
             game_state: &mut CardGameSharedState,
-            _: &mut Vec<Vec<Animation>>,
         ) -> CheckPhaseCompleteResult {
-            let mut result = CheckPhaseCompleteResult {
-                is_phase_complete: false,
-                next_phase_index: None,
-                is_required_own_input_for_complete: None,
-            };
+            let mut result = CheckPhaseCompleteResult::empty();
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
             if let Some(_) = game_state
@@ -362,7 +346,11 @@ impl Phase {
                 result.is_phase_complete = true;
                 result.is_required_own_input_for_complete =
                     Some(game_state.initiatives_to_player_index[0] == own_player_index);
-                if game_state.cards_bid_on.is_empty() {
+                // TODO
+                // 2以上ないと入札ができない
+                // アイテム数が偶数なら1になることはないのだが、なぜか1になるケースがある
+                // 根本的解決が必要
+                if game_state.cards_bid_on.len() < 2 {
                     if game_state.players[0].own_card_list.is_empty()
                         && game_state.players[1].own_card_list.is_empty()
                     {
@@ -395,10 +383,7 @@ impl Phase {
     }
 
     pub fn get_game_end_phase() -> Phase {
-        fn check_game_end_complete_func(
-            _: &mut CardGameSharedState,
-            _: &mut Vec<Vec<Animation>>,
-        ) -> CheckPhaseCompleteResult {
+        fn check_game_end_complete_func(_: &mut CardGameSharedState) -> CheckPhaseCompleteResult {
             CheckPhaseCompleteResult {
                 is_phase_complete: true,
                 next_phase_index: None,
@@ -413,6 +398,7 @@ impl Phase {
     }
 }
 
+#[derive(Debug)]
 pub struct CheckPhaseCompleteResult {
     pub is_phase_complete: bool,
     pub next_phase_index: Option<usize>,
@@ -424,7 +410,7 @@ impl CheckPhaseCompleteResult {
         CheckPhaseCompleteResult {
             is_phase_complete: false,
             next_phase_index: None,
-            is_required_own_input_for_complete: None,
+            is_required_own_input_for_complete: Some(false),
         }
     }
 }

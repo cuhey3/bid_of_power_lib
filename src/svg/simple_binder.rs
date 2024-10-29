@@ -1,4 +1,4 @@
-use crate::bop::state::message::CardGameSharedState;
+use crate::bop::state::card_game_shared_state::CardGameSharedState;
 use web_sys::Element;
 
 #[derive(Clone)]

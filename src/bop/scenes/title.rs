@@ -17,7 +17,7 @@ impl TitleState {
     pub fn create_title_scene(shared_state: &mut State) -> Scene {
         let document = &shared_state.elements.document;
         let title_state = TitleState {
-            cursor: Cursor::new(document, "title-cursor", 2, 60.0),
+            cursor: Cursor::new(document, "title-cursor", 3, 60.0),
         };
         let consume_func = title_state.create_consume_func();
         let init_func = title_state.create_init_func();
@@ -51,7 +51,7 @@ impl TitleState {
     pub fn create_consume_func(&self) -> fn(&mut Scene, &mut State, Input) {
         fn consume_func(scene: &mut Scene, shared_state: &mut State, input: Input) {
             if let State {
-                state_type: BoPShared(..),
+                state_type: BoPShared(card_game_shared_state),
                 to_send_channel_messages,
                 ..
             } = shared_state
@@ -63,6 +63,7 @@ impl TitleState {
                         }
                         Input::Enter => {
                             if title_state.cursor.chose_index == 0 {
+                                card_game_shared_state.has_cpu = true;
                                 shared_state.primitives.requested_scene_index = 1;
                                 to_send_channel_messages.push(
                                     serde_json::to_string(&GameStartIsApprovedMessage {
@@ -79,6 +80,22 @@ impl TitleState {
                                     .unwrap(),
                                 );
                             } else if title_state.cursor.chose_index == 1 {
+                                shared_state.primitives.requested_scene_index = 1;
+                                to_send_channel_messages.push(
+                                    serde_json::to_string(&GameStartIsApprovedMessage {
+                                        player_index: 0,
+                                        game_start_is_approved: true,
+                                    })
+                                    .unwrap(),
+                                );
+                                to_send_channel_messages.push(
+                                    serde_json::to_string(&GameStartIsApprovedMessage {
+                                        player_index: 1,
+                                        game_start_is_approved: true,
+                                    })
+                                    .unwrap(),
+                                );
+                            } else if title_state.cursor.chose_index == 2 {
                                 to_send_channel_messages.push(
                                     serde_json::to_string(&ChannelMessage {
                                         user_name: shared_state.user_name.to_string(),

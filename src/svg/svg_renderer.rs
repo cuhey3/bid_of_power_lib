@@ -1,6 +1,5 @@
 use crate::engine::input::Input;
 use wasm_bindgen::JsCast;
-use wasm_bindgen_test::console_log;
 use web_sys::{Document, Element};
 
 #[derive(Debug)]
@@ -81,7 +80,6 @@ impl Cursor {
         }
     }
     pub fn consume(&mut self, input: Input) {
-        console_log!("cursor consume 1 {} {:?}", self.chose_index, input);
         let new_index = match self.cursor_type {
             CursorType::Default => match input {
                 Input::ArrowUp => (self.chose_index + self.choice_length - 1) % self.choice_length,

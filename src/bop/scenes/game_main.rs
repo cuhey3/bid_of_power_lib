@@ -1,3 +1,7 @@
+use crate::bop::cpu_player::CPUPlayer;
+use crate::bop::state::message::{
+    AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, GameStateMessage, UseCardMessage,
+};
 use crate::engine::application_types::SceneType::BoPGameMain;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::input::Input;
@@ -8,8 +12,6 @@ use crate::features::websocket::{ChannelMessage, MessageType};
 use crate::svg::element_wrapper::ElementWrapper;
 use crate::svg::svg_renderer::{Cursor, SvgRenderer};
 use wasm_bindgen_test::console_log;
-use crate::bop::state::message::{AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, GameStateMessage, UseCardMessage};
-use crate::bop::state::phase::CheckPhaseCompleteResult;
 
 pub struct GameMainState {
     renderers: Vec<SvgRenderer>,
@@ -557,51 +559,9 @@ impl GameMainState {
                         }
                         _ => {}
                     }
-                    console_log!("complete message logic");
-                    console_log!("start phase check");
-                    let mut check_result = CheckPhaseCompleteResult::empty();
-                    'outer: for player_index in 0..card_game_shared_state.players.len() {
-                        if shared_state.is_matched
-                            && card_game_shared_state.own_player_index != player_index
-                        {
-                            continue;
-                        }
-                        card_game_shared_state.own_player_index = player_index;
-                        'inner: loop {
-                            check_result =
-                                card_game_shared_state.check_phase_complete(interrupt_animations);
-                            console_log!("check result {}", check_result.is_phase_complete);
-                            console_log!("check result {:?}", check_result.next_phase_index);
-                            console_log!(
-                                "check result {:?}",
-                                check_result.is_required_own_input_for_complete
-                            );
-                            if check_result.is_phase_complete {
-                                if check_result.next_phase_index.unwrap() == 4 {
-                                    console_log!("battle end");
-                                    break 'outer;
-                                }
-                                console_log!(
-                                    "phase shift to start, turn: {}",
-                                    card_game_shared_state.turn
-                                );
-                                card_game_shared_state.phase_shift_to(
-                                    interrupt_animations,
-                                    check_result.next_phase_index.unwrap(),
-                                );
-                                console_log!(
-                                    "phase shift to end, turn:  {}",
-                                    card_game_shared_state.turn
-                                );
-                                game_main_state.renderers[0].cursor.reset();
-                            } else {
-                                break 'inner;
-                            }
-                        }
-                        if check_result.is_required_own_input_for_complete.unwrap() {
-                            break;
-                        }
-                    }
+                    let check_result =
+                        card_game_shared_state.check_phase_complete(shared_state.is_matched);
+                    game_main_state.renderers[0].cursor.reset();
                     if let Some(next_phase_index) = check_result.next_phase_index {
                         if next_phase_index == 4 {
                             card_game_shared_state.phase_index = 4;
@@ -620,9 +580,22 @@ impl GameMainState {
                         "next input is... {:?}",
                         check_result.is_required_own_input_for_complete
                     );
-
                     card_game_shared_state.input_is_guard =
                         !check_result.is_required_own_input_for_complete.unwrap();
+                    if card_game_shared_state.input_is_guard && card_game_shared_state.has_cpu {
+                        let cpu_player = &mut CPUPlayer::new(card_game_shared_state);
+                        cpu_player.card_game_shared_state.own_player_index = 1;
+                        cpu_player.card_game_shared_state.has_cpu = false;
+                        let player_index = card_game_shared_state.own_player_index;
+                        let opponent_player_index =
+                            (player_index + 1) % card_game_shared_state.players.len();
+                        let index =
+                            cpu_player.simulate_multiple_times(opponent_player_index, 40000);
+                        console_log!("cpu index is... {}", index);
+                        shared_state
+                            .to_send_channel_messages
+                            .push(cpu_player.create_cpu_message(index));
+                    }
                     let card_names = card_game_shared_state
                         .cards_bid_on
                         .iter()

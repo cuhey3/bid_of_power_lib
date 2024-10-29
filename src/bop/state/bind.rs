@@ -1,4 +1,5 @@
-use crate::bop::state::message::{BidMessage, CardGameSharedState};
+use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::message::BidMessage;
 use crate::svg::simple_binder::SimpleBinder;
 use crate::svg::svg_renderer::get_element_by_id;
 
