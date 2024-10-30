@@ -5,6 +5,7 @@ use crate::bop::mechanism::card::CardKind::{
 };
 use crate::bop::state::card_game_shared_state::CardGameSharedState;
 use rand::prelude::SliceRandom;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen_test::console_log;
 
 #[derive(Clone, Debug)]
@@ -444,7 +445,7 @@ impl Card {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CardKind {
     LongSword,
     LeatherArmour,

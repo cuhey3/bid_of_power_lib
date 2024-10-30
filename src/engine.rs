@@ -1,3 +1,4 @@
+use crate::bop::state::message::GameRuleMessage;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::features::animation::Animation;
 use crate::features::websocket::{ChannelMessage, MessageType, WebSocketWrapper};
@@ -94,6 +95,7 @@ impl Engine {
                 scene.hide();
             }
         }
+        self.shared_state.elements.message.hide();
         let init_func = self.scenes[scene_index].init_func;
         init_func(&mut self.scenes[scene_index], &mut self.shared_state);
     }
@@ -132,7 +134,11 @@ impl Engine {
                         let to_send_message = serde_json::to_string(&ChannelMessage {
                             user_name: self.shared_state.user_name.to_string(),
                             message_type: MessageType::MatchResponse,
-                            message: special_message.user_name.clone(),
+                            message: serde_json::to_string(&GameRuleMessage::from_state(
+                                &mut self.shared_state,
+                                special_message.user_name.clone(),
+                            ))
+                            .unwrap(),
                         })
                         .unwrap();
                         console_log!("to_send_message {}", to_send_message);
@@ -143,36 +149,45 @@ impl Engine {
                     return;
                 }
                 MessageType::MatchResponse => {
-                    if special_message.user_name != self.shared_state.user_name
-                        && special_message.message == self.shared_state.user_name
+                    if let Ok(message) =
+                        serde_json::from_str::<GameRuleMessage>(&special_message.message)
                     {
-                        if let BoPShared(card_game_shared_state) = &mut self.shared_state.state_type
+                        if message.host_player_name != self.shared_state.user_name
+                            && message.guest_player_name == self.shared_state.user_name
                         {
-                            card_game_shared_state.own_player_index = 0;
-                            console_log!("you are first.");
+                            if let BoPShared(card_game_shared_state) =
+                                &mut self.shared_state.state_type
+                            {
+                                card_game_shared_state.update_card_list(message.card_kind_list);
+                                card_game_shared_state.own_player_index =
+                                    message.guest_player_index;
+                                console_log!("you are guest.");
+                            }
+                        } else if message.host_player_name == self.shared_state.user_name {
+                            if let BoPShared(card_game_shared_state) =
+                                &mut self.shared_state.state_type
+                            {
+                                card_game_shared_state.update_card_list(message.card_kind_list);
+                                card_game_shared_state.own_player_index = message.host_player_index;
+                                console_log!("you are host.");
+                            }
+                        } else {
+                            return;
                         }
-                    } else if special_message.user_name == self.shared_state.user_name {
-                        if let BoPShared(card_game_shared_state) = &mut self.shared_state.state_type
-                        {
-                            card_game_shared_state.own_player_index = 1;
-                            console_log!("you are second.");
-                        }
-                    } else {
-                        return;
+                        console_log!(
+                            "match response {} {}",
+                            special_message.message,
+                            special_message.user_name
+                        );
+                        self.web_socket_wrapper.ws.close().unwrap();
+                        self.web_socket_wrapper.state.borrow_mut().channel_name =
+                            format!("bop-{}", special_message.message);
+                        self.web_socket_wrapper.force_update_not_ready();
+                        self.web_socket_wrapper.request_reconnect();
+                        self.shared_state.is_request_matching = false;
+                        self.shared_state.primitives.requested_scene_index = 1;
+                        self.shared_state.is_matched = true;
                     }
-                    console_log!(
-                        "match response {} {}",
-                        special_message.message,
-                        special_message.user_name
-                    );
-                    self.web_socket_wrapper.ws.close().unwrap();
-                    self.web_socket_wrapper.state.borrow_mut().channel_name =
-                        format!("bop-{}", special_message.message);
-                    self.web_socket_wrapper.force_update_not_ready();
-                    self.web_socket_wrapper.request_reconnect();
-                    self.shared_state.is_request_matching = false;
-                    self.shared_state.primitives.requested_scene_index = 1;
-                    self.shared_state.is_matched = true;
                 }
                 _ => {}
             }

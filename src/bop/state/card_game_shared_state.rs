@@ -1,4 +1,4 @@
-use crate::bop::mechanism::card::Card;
+use crate::bop::mechanism::card::{Card, CardKind};
 use crate::bop::mechanism::player_state::PlayerState;
 use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::*;
@@ -235,5 +235,13 @@ impl CardGameSharedState {
             _ => {}
         }
         self.phase_index = self.phases[next_phase_index].phase_type.to_owned() as i32 as usize;
+    }
+
+    pub fn update_card_list(&mut self, card_kind_list: Vec<CardKind>) {
+        let new_cards = card_kind_list
+            .into_iter()
+            .map(|card_kind| Card::from(card_kind))
+            .collect::<Vec<Card>>();
+        self.bid_scheduled_cards = new_cards;
     }
 }

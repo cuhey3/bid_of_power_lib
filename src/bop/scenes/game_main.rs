@@ -25,12 +25,6 @@ impl GameMainState {
     pub fn create_game_main_scene(shared_state: &mut State) -> Scene {
         let mut renderer = SvgRenderer::new("game-main-bid".to_string(), 45.0);
         renderer.cursor.update_choice_length(3);
-        console_log!(
-            "cursor info {:?} {:?} {:?}",
-            renderer.cursor.cursor_type,
-            renderer.cursor.choice_length,
-            renderer.cursor.step_length
-        );
 
         let mut game_main_state = GameMainState {
             renderers: vec![
@@ -76,12 +70,7 @@ impl GameMainState {
     }
     pub fn create_init_func(&self) -> fn(&mut Scene, &mut State) {
         fn init_func(scene: &mut Scene, state: &mut State) {
-            console_log!("init game main scene");
             scene.show();
-            match &mut scene.scene_type {
-                BoPGameMain(..) => {}
-                _ => panic!(),
-            }
             if let BoPShared(card_game_shared_state) = &mut state.state_type {
                 state.to_send_channel_messages.push(
                     serde_json::to_string(&GameStartIsApprovedMessage {
@@ -194,6 +183,7 @@ impl GameMainState {
                                     {
                                         interrupt_animations.push(vec![Animation::create_message(
                                             "Moneyが足りません".to_string(),
+                                            true,
                                         )]);
                                         return;
                                     }
@@ -509,6 +499,7 @@ impl GameMainState {
                                             card_game_shared_state.players[message.player_index]
                                                 .player_name
                                         ),
+                                        true,
                                     )])
                                 } else {
                                     let opponent_player_index = (message.player_index + 1)
@@ -551,6 +542,7 @@ impl GameMainState {
                                                 .player_state
                                                 .current_hp,
                                         ),
+                                        true,
                                     )]);
                                 }
                                 card_game_shared_state.attack_target_history.push(message);

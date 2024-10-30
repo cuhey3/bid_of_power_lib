@@ -118,7 +118,7 @@ impl Animation {
             },
         }
     }
-    pub fn create_message(message: String) -> Animation {
+    pub fn create_message(message: String, is_block_scene_update: bool) -> Animation {
         let document = web_sys::window().unwrap().document().unwrap();
         let elements = vec![
             document.get_element_by_id("message").unwrap(),
@@ -128,7 +128,7 @@ impl Animation {
         Animation {
             args_i32: vec![],
             messages: vec![message.to_owned()],
-            block_scene_update: true,
+            block_scene_update: is_block_scene_update,
             start_step: -1.0,
             elements,
             span: AnimationSpan::None,
@@ -140,8 +140,8 @@ impl Animation {
                     animation.block_scene_update = false;
                     return true;
                 }
-                animation.block_scene_update = true;
-                references.borrow_mut().has_block_message = true;
+                references.borrow_mut().has_block_message =
+                    references.borrow_mut().has_block_message || animation.block_scene_update;
                 animation.elements[0]
                     .set_attribute("display", "block")
                     .unwrap();

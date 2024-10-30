@@ -105,13 +105,11 @@ impl TitleState {
                                     .unwrap(),
                                 );
                                 shared_state.is_request_matching = true;
-                                // shared_state.interrupt_animations.push(vec![
-                                //     Animation::create_message("Coming soon...".to_string()),
-                                // ]);
-                                return;
-                            } else {
                                 shared_state.interrupt_animations.push(vec![
-                                    Animation::create_message("Coming soon...".to_string()),
+                                    Animation::create_message(
+                                        "対戦相手を待っています…".to_string(),
+                                        false,
+                                    ),
                                 ]);
                                 return;
                             }

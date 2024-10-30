@@ -1,4 +1,9 @@
+use crate::bop::mechanism::card::CardKind;
+use crate::engine::application_types::StateType::BoPShared;
+use crate::engine::state::State;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GameStartIsApprovedMessage {
     pub player_index: usize,
@@ -122,4 +127,37 @@ impl AttackTargetMessage {
 pub struct GameStateMessage {
     pub player_index: usize,
     pub last_consumed_seq_no: usize,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GameRuleMessage {
+    pub host_player_name: String,
+    pub host_player_index: usize,
+    pub guest_player_name: String,
+    pub guest_player_index: usize,
+    pub card_kind_list: Vec<CardKind>,
+}
+
+impl GameRuleMessage {
+    pub fn from_state(state: &mut State, guest_player_name: String) -> GameRuleMessage {
+        let mut rng = thread_rng();
+        if let BoPShared(card_game_shared_state) = &state.state_type {
+            let card_kind_list = card_game_shared_state
+                .bid_scheduled_cards
+                .iter()
+                .map(|card| card.card_kind.clone())
+                .collect::<Vec<CardKind>>();
+
+            let host_is_first = rng.gen_bool(0.5);
+            GameRuleMessage {
+                host_player_name: state.user_name.to_string(),
+                host_player_index: if host_is_first { 0 } else { 1 },
+                guest_player_name,
+                guest_player_index: if host_is_first { 1 } else { 0 },
+                card_kind_list,
+            }
+        } else {
+            panic!()
+        }
+    }
 }
