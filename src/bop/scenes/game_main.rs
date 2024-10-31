@@ -1,4 +1,3 @@
-use crate::bop::cpu_player::CPUPlayer;
 use crate::bop::state::message::{
     AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, UseItemMessage,
 };
@@ -362,18 +361,9 @@ impl GameMainState {
                     bop_shared_state.input_is_guard =
                         !check_result.is_required_own_input_for_complete.unwrap();
                     if bop_shared_state.input_is_guard && bop_shared_state.has_cpu {
-                        let cpu_player = &mut CPUPlayer::new(bop_shared_state);
-                        cpu_player.bop_shared_state.own_player_index = 1;
-                        cpu_player.bop_shared_state.has_cpu = false;
-                        let player_index = bop_shared_state.own_player_index;
-                        let opponent_player_index =
-                            bop_shared_state.opponent_player_index(player_index);
-                        let index =
-                            cpu_player.simulate_multiple_times(opponent_player_index, 40000);
-                        console_log!("cpu index is... {}", index);
-                        shared_state
-                            .to_send_channel_messages
-                            .push(cpu_player.create_cpu_message(index));
+                        shared_state.has_cpu_task = true;
+                        shared_state.cpu_task_start_step = -1.0;
+                        return;
                     }
                     let item_names = bop_shared_state
                         .items_bid_on

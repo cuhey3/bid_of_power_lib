@@ -22,10 +22,15 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         }
         if bop_shared_state.input_is_guard {
             return format!(
-                "{}さんの入力を待っています...",
+                "{}{}が考えています...",
                 bop_shared_state.players
                     [bop_shared_state.opponent_player_index(bop_shared_state.own_player_index)]
-                .player_name
+                .player_name,
+                if bop_shared_state.has_cpu && bop_shared_state.own_player_index == 0 {
+                    "(CPU)"
+                } else {
+                    "さん"
+                }
             );
         }
         match bop_shared_state.phase_index {

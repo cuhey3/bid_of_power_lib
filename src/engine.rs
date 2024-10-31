@@ -285,5 +285,14 @@ impl Engine {
                 bop_shared_state.simple_binders[n] = binder.clone();
             }
         }
+        if self.shared_state.has_cpu_task {
+            if self.shared_state.cpu_task_start_step == -1.0 {
+                self.shared_state.cpu_task_start_step = step;
+            } else {
+                if self.shared_state.cpu_task_start_step + 50.0 < step {
+                    self.shared_state.start_cpu_task();
+                }
+            }
+        }
     }
 }

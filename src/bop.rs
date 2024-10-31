@@ -18,6 +18,7 @@ use state::phase::Phase;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen_test::console_log;
+use crate::bop::cpu_player::CPUPlayer;
 
 mod cpu_player;
 pub mod mechanism;
@@ -90,6 +91,8 @@ pub fn mount() -> Engine {
         is_request_matching: false,
         is_matched: false,
         keep_connection_request: false,
+        has_cpu_task: false,
+        cpu_task_start_step: -1.0,
     };
 
     let mut scenes = vec![
@@ -104,6 +107,26 @@ pub fn mount() -> Engine {
 }
 
 impl State {
+    pub fn start_cpu_task(&mut self) {
+        if let State {
+            state_type: BoPShared(bop_shared_state),
+            ..
+        } = self {
+            let cpu_player = &mut CPUPlayer::new(bop_shared_state);
+            cpu_player.bop_shared_state.own_player_index = 1;
+            cpu_player.bop_shared_state.has_cpu = false;
+            let player_index = bop_shared_state.own_player_index;
+            let opponent_player_index =
+                bop_shared_state.opponent_player_index(player_index);
+            let index =
+                cpu_player.simulate_multiple_times(opponent_player_index, 40000);
+            console_log!("cpu index is... {}", index);
+            self
+                .to_send_channel_messages
+                .push(cpu_player.create_cpu_message(index));
+        }
+        self.has_cpu_task = false;
+    }
     pub fn consume_channel_message(&mut self, message: &ChannelMessage) {
         console_log!("consume_channel_message start {}", message.message);
         if let State {

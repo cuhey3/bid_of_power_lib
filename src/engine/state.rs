@@ -27,4 +27,6 @@ pub struct State {
     pub is_request_matching: bool,
     pub is_matched: bool,
     pub keep_connection_request: bool,
+    pub has_cpu_task: bool,
+    pub cpu_task_start_step: f64,
 }
