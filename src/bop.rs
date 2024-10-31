@@ -186,109 +186,12 @@ impl State {
                             "complete game start is approved message logic {:?}",
                             message
                         );
-                    } else if let Ok(message) = serde_json::from_str::<BidMessage>(&message.message)
-                    {
-                        console_log!("enter bid message logic {:?}", message);
-                        if !bop_shared_state.check_and_update_seq_no(
-                            message.seq_no,
-                            message.player_index == bop_shared_state.own_player_index,
-                        ) {
-                            return;
-                        }
-                        bop_shared_state.temporary_bid_history.push(message);
-                        BidMessage::ready_bid_input(
-                            &mut bop_shared_state.bid_input,
-                            &bop_shared_state.temporary_bid_history,
+                    } else {
+                        bop_shared_state.update_game_state_by_message(
+                            message.message.clone(),
+                            interrupt_animations,
+                            false,
                         );
-                        console_log!("complete bid message logic");
-                    } else if let Ok(message) =
-                        serde_json::from_str::<UseCardMessage>(&message.message)
-                    {
-                        console_log!("enter use item message logic {:?}", message);
-                        if !bop_shared_state.check_and_update_seq_no(
-                            message.seq_no,
-                            message.player_index == bop_shared_state.own_player_index,
-                        ) {
-                            return;
-                        }
-                        console_log!("use item logic 1");
-                        if !message.is_skipped {
-                            let item = bop_shared_state.players[message.player_index]
-                                .own_item_list
-                                .remove(message.use_item_index);
-                            console_log!("use item logic 2");
-                            let mut item_use_functions = item.get_use_func(message.player_index);
-                            item_use_functions(bop_shared_state);
-                        }
-                        console_log!("use item logic 3");
-                        bop_shared_state.use_item_history.push(message);
-                        console_log!("complete use item message logic");
-                    } else if let Ok(message) =
-                        serde_json::from_str::<AttackTargetMessage>(&message.message)
-                    {
-                        console_log!("enter attack target message logic {:?}", message);
-                        if !bop_shared_state.check_and_update_seq_no(
-                            message.seq_no,
-                            message.player_index == bop_shared_state.own_player_index,
-                        ) {
-                            return;
-                        }
-                        if message.is_skipped {
-                            bop_shared_state.players[message.player_index]
-                                .player_state
-                                .current_money_amount += 1;
-                            interrupt_animations.push(vec![Animation::create_message(
-                                format!(
-                                    "{}さんは 1 Moneyを得た",
-                                    bop_shared_state.players[message.player_index].player_name
-                                ),
-                                true,
-                            )])
-                        } else {
-                            let opponent_player_index =
-                                (message.player_index + 1) % bop_shared_state.players.iter().len();
-                            let opponent_player_defence_point = bop_shared_state.players
-                                [opponent_player_index]
-                                .player_state
-                                .defence_point;
-                            let player_attack_point = bop_shared_state.players
-                                [message.player_index]
-                                .player_state
-                                .attack_point;
-                            let damage = if player_attack_point == 0 {
-                                0
-                            } else if opponent_player_defence_point >= player_attack_point {
-                                1
-                            } else {
-                                player_attack_point - opponent_player_defence_point
-                            };
-                            if damage
-                                >= bop_shared_state.players[opponent_player_index]
-                                    .player_state
-                                    .current_hp
-                            {
-                                bop_shared_state.players[opponent_player_index]
-                                    .player_state
-                                    .current_hp = 0;
-                            } else {
-                                bop_shared_state.players[opponent_player_index]
-                                    .player_state
-                                    .current_hp -= damage;
-                            }
-                            interrupt_animations.push(vec![Animation::create_message(
-                                format!(
-                                    "{}さんに{}のダメージ（残りHP: {}）",
-                                    bop_shared_state.players[opponent_player_index].player_name,
-                                    damage,
-                                    bop_shared_state.players[opponent_player_index]
-                                        .player_state
-                                        .current_hp,
-                                ),
-                                true,
-                            )]);
-                        }
-                        bop_shared_state.attack_target_history.push(message);
-                        console_log!("complete attack target message logic");
                     }
                 }
                 _ => {}

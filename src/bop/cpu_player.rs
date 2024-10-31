@@ -287,8 +287,7 @@ impl CPUPlayer {
                         random_inputs.push(bid_item_index);
                         input_players.push(simulating_player == player_index);
                     }
-                    CPUPlayer::headless_consume_message(
-                        bop_shared_state,
+                    bop_shared_state.update_game_state_by_message(
                         serde_json::to_string(&BidMessage {
                             seq_no: bop_shared_state.consumed_seq_no + 1,
                             player_index,
@@ -296,6 +295,8 @@ impl CPUPlayer {
                             bid_amount: bop_shared_state.bid_input[bid_item_index].bid_amount,
                         })
                         .unwrap(),
+                        &mut vec![],
+                        true,
                     );
                 }
                 2 => {
@@ -305,8 +306,7 @@ impl CPUPlayer {
                         random_inputs.push(index);
                         input_players.push(simulating_player == player_index);
                     }
-                    CPUPlayer::headless_consume_message(
-                        bop_shared_state,
+                    bop_shared_state.update_game_state_by_message(
                         serde_json::to_string(&UseCardMessage {
                             seq_no: bop_shared_state.consumed_seq_no + 1,
                             turn,
@@ -318,6 +318,8 @@ impl CPUPlayer {
                             args_usize: vec![],
                         })
                         .unwrap(),
+                        &mut vec![],
+                        true,
                     );
                 }
                 3 => {
@@ -326,8 +328,7 @@ impl CPUPlayer {
                         random_inputs.push(index);
                         input_players.push(simulating_player == player_index);
                     }
-                    CPUPlayer::headless_consume_message(
-                        bop_shared_state,
+                    bop_shared_state.update_game_state_by_message(
                         serde_json::to_string(&AttackTargetMessage {
                             seq_no: bop_shared_state.consumed_seq_no + 1,
                             turn,
@@ -337,6 +338,8 @@ impl CPUPlayer {
                             is_skipped: index == 1,
                         })
                         .unwrap(),
+                        &mut vec![],
+                        true,
                     )
                 }
                 _ => {}
@@ -351,59 +354,5 @@ impl CPUPlayer {
                 != 0,
             bop_shared_state.consumed_seq_no,
         )
-    }
-    pub fn headless_consume_message(bop_shared_state: &mut BoPSharedState, message: String) {
-        if let Ok(message) = serde_json::from_str::<BidMessage>(&message) {
-            bop_shared_state.temporary_bid_history.push(message);
-            BidMessage::ready_bid_input(
-                &mut bop_shared_state.bid_input,
-                &bop_shared_state.temporary_bid_history,
-            );
-        } else if let Ok(message) = serde_json::from_str::<UseCardMessage>(&message) {
-            if !message.is_skipped {
-                let item = bop_shared_state.players[message.player_index]
-                    .own_item_list
-                    .remove(message.use_item_index);
-                let mut item_use_functions = item.get_use_func(message.player_index);
-                item_use_functions(bop_shared_state);
-            }
-            bop_shared_state.use_item_history.push(message);
-        } else if let Ok(message) = serde_json::from_str::<AttackTargetMessage>(&message) {
-            if message.is_skipped {
-                bop_shared_state.players[message.player_index]
-                    .player_state
-                    .current_money_amount += 1;
-            } else {
-                let opponent_player_index =
-                    (message.player_index + 1) % bop_shared_state.players.iter().len();
-                let opponent_player_defence_point = bop_shared_state.players[opponent_player_index]
-                    .player_state
-                    .defence_point;
-                let player_attack_point = bop_shared_state.players[message.player_index]
-                    .player_state
-                    .attack_point;
-                let damage = if player_attack_point == 0 {
-                    0
-                } else if opponent_player_defence_point >= player_attack_point {
-                    1
-                } else {
-                    player_attack_point - opponent_player_defence_point
-                };
-                if damage
-                    >= bop_shared_state.players[opponent_player_index]
-                        .player_state
-                        .current_hp
-                {
-                    bop_shared_state.players[opponent_player_index]
-                        .player_state
-                        .current_hp = 0;
-                } else {
-                    bop_shared_state.players[opponent_player_index]
-                        .player_state
-                        .current_hp -= damage;
-                }
-            }
-            bop_shared_state.attack_target_history.push(message);
-        }
     }
 }

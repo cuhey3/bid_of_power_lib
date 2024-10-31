@@ -3,6 +3,7 @@ use crate::bop::mechanism::player_state::PlayerState;
 use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::*;
 use crate::bop::state::phase::{CheckPhaseCompleteResult, Phase};
+use crate::features::animation::Animation;
 use crate::svg::simple_binder::SimpleBinder;
 use wasm_bindgen_test::console_log;
 
@@ -241,5 +242,90 @@ impl BoPSharedState {
             .map(|item_kind| Item::from(item_kind))
             .collect::<Vec<Item>>();
         self.bid_scheduled_items = new_items;
+    }
+
+    pub fn update_game_state_by_message(
+        &mut self,
+        message: String,
+        interrupt_animations: &mut Vec<Vec<Animation>>,
+        is_headless: bool,
+    ) {
+        if let Ok(message) = serde_json::from_str::<BidMessage>(&message) {
+            if !self.check_and_update_seq_no(
+                message.seq_no,
+                message.player_index == self.own_player_index,
+            ) {
+                return;
+            }
+            self.temporary_bid_history.push(message);
+            BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
+        } else if let Ok(message) = serde_json::from_str::<UseCardMessage>(&message) {
+            if !self.check_and_update_seq_no(
+                message.seq_no,
+                message.player_index == self.own_player_index,
+            ) {
+                return;
+            }
+            if !message.is_skipped {
+                let item = self.players[message.player_index]
+                    .own_item_list
+                    .remove(message.use_item_index);
+                let mut item_use_functions = item.get_use_func(message.player_index);
+                item_use_functions(self);
+            }
+            self.use_item_history.push(message);
+        } else if let Ok(message) = serde_json::from_str::<AttackTargetMessage>(&message) {
+            if !self.check_and_update_seq_no(
+                message.seq_no,
+                message.player_index == self.own_player_index,
+            ) {
+                return;
+            }
+            if message.is_skipped {
+                self.players[message.player_index]
+                    .player_state
+                    .current_money_amount += 1;
+                if !is_headless {
+                    interrupt_animations.push(vec![Animation::create_message(
+                        format!(
+                            "{}さんは 1 Moneyを得た",
+                            self.players[message.player_index].player_name
+                        ),
+                        true,
+                    )]);
+                }
+            } else {
+                let opponent_player_index = (message.player_index + 1) % self.players.iter().len();
+                let opponent_player_defence_point = self.players[opponent_player_index]
+                    .player_state
+                    .defence_point;
+                let player_attack_point =
+                    self.players[message.player_index].player_state.attack_point;
+                let damage = if player_attack_point == 0 {
+                    0
+                } else if opponent_player_defence_point >= player_attack_point {
+                    1
+                } else {
+                    player_attack_point - opponent_player_defence_point
+                };
+                if damage >= self.players[opponent_player_index].player_state.current_hp {
+                    self.players[opponent_player_index].player_state.current_hp = 0;
+                } else {
+                    self.players[opponent_player_index].player_state.current_hp -= damage;
+                }
+                if !is_headless {
+                    interrupt_animations.push(vec![Animation::create_message(
+                        format!(
+                            "{}さんに{}のダメージ（残りHP: {}）",
+                            self.players[opponent_player_index].player_name,
+                            damage,
+                            self.players[opponent_player_index].player_state.current_hp,
+                        ),
+                        true,
+                    )]);
+                }
+            }
+            self.attack_target_history.push(message);
+        }
     }
 }
