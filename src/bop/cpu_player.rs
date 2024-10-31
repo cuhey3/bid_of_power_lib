@@ -299,9 +299,7 @@ impl CPUPlayer {
                     );
                 }
                 2 => {
-                    let item_len = bop_shared_state.players[player_index]
-                        .own_item_list
-                        .len();
+                    let item_len = bop_shared_state.players[player_index].own_item_list.len();
                     let index = rng.gen_index(..item_len + 1);
                     if random_inputs.len() < 6 {
                         random_inputs.push(index);
@@ -354,10 +352,7 @@ impl CPUPlayer {
             bop_shared_state.consumed_seq_no,
         )
     }
-    pub fn headless_consume_message(
-        bop_shared_state: &mut BoPSharedState,
-        message: String,
-    ) {
+    pub fn headless_consume_message(bop_shared_state: &mut BoPSharedState, message: String) {
         if let Ok(message) = serde_json::from_str::<BidMessage>(&message) {
             bop_shared_state.temporary_bid_history.push(message);
             BidMessage::ready_bid_input(
@@ -381,8 +376,7 @@ impl CPUPlayer {
             } else {
                 let opponent_player_index =
                     (message.player_index + 1) % bop_shared_state.players.iter().len();
-                let opponent_player_defence_point = bop_shared_state.players
-                    [opponent_player_index]
+                let opponent_player_defence_point = bop_shared_state.players[opponent_player_index]
                     .player_state
                     .defence_point;
                 let player_attack_point = bop_shared_state.players[message.player_index]

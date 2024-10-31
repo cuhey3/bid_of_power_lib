@@ -15,22 +15,16 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     fn required_input_func(bop_shared_state: &mut BoPSharedState, _: usize) -> String {
         if bop_shared_state.phase_index == 4 {
             if bop_shared_state.players[0].player_state.current_hp > 0 {
-                return format!(
-                    "{}さんの勝利です",
-                    bop_shared_state.players[0].player_name
-                );
+                return format!("{}さんの勝利です", bop_shared_state.players[0].player_name);
             } else {
-                return format!(
-                    "{}さんの勝利です",
-                    bop_shared_state.players[1].player_name
-                );
+                return format!("{}さんの勝利です", bop_shared_state.players[1].player_name);
             }
         }
         if bop_shared_state.input_is_guard {
             return format!(
                 "{}さんの入力を待っています...",
-                bop_shared_state.players[(bop_shared_state.own_player_index + 1)
-                    % bop_shared_state.players.len()]
+                bop_shared_state.players
+                    [(bop_shared_state.own_player_index + 1) % bop_shared_state.players.len()]
                 .player_name
             );
         }
@@ -53,10 +47,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     binds.push(SimpleBinder::new(required_input, 0, required_input_func));
 
-    fn bid_amount_func(
-        bop_shared_state: &mut BoPSharedState,
-        args_usize: usize,
-    ) -> String {
+    fn bid_amount_func(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
         if let Some(bid_input) = bop_shared_state.bid_input.get(args_usize) {
             bid_input.bid_amount.to_string()
         } else {
@@ -64,14 +55,9 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         }
     }
 
-    fn current_amount_func(
-        bop_shared_state: &mut BoPSharedState,
-        args_usize: usize,
-    ) -> String {
-        let amount = BidMessage::current_bid_amount(
-            args_usize,
-            &bop_shared_state.temporary_bid_history,
-        );
+    fn current_amount_func(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+        let amount =
+            BidMessage::current_bid_amount(args_usize, &bop_shared_state.temporary_bid_history);
         if amount == 0 {
             "-".to_string()
         } else {
@@ -92,14 +78,8 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..11 {
-        fn item_list_a(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
-            if let Some(item) = bop_shared_state.players[0]
-                .own_item_list
-                .get(args_usize)
-            {
+        fn item_list_a(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+            if let Some(item) = bop_shared_state.players[0].own_item_list.get(args_usize) {
                 item.item_kind.get_item_name()
             } else {
                 "".to_string()
@@ -114,10 +94,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(item) = bop_shared_state.players[0]
-                .own_item_list
-                .get(args_usize)
-            {
+            if let Some(item) = bop_shared_state.players[0].own_item_list.get(args_usize) {
                 item.item_kind.get_item_description()
             } else {
                 "".to_string()
@@ -130,14 +107,8 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..10 {
-        fn bop_list_b(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
-            if let Some(item) = bop_shared_state.players[1]
-                .own_item_list
-                .get(args_usize)
-            {
+        fn bop_list_b(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+            if let Some(item) = bop_shared_state.players[1].own_item_list.get(args_usize) {
                 item.item_kind.get_item_name()
             } else {
                 "".to_string()
@@ -152,10 +123,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(item) = bop_shared_state.players[1]
-                .own_item_list
-                .get(args_usize)
-            {
+            if let Some(item) = bop_shared_state.players[1].own_item_list.get(args_usize) {
                 item.item_kind.get_item_description()
             } else {
                 "".to_string()
@@ -168,10 +136,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..2 {
-        fn player_info_money(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
+        fn player_info_money(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             let player_state = &bop_shared_state.players[args_usize].player_state;
             format!(
                 "{}(+{})",
@@ -188,10 +153,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..19 {
-        fn scheduled_item(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
+        fn scheduled_item(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             if let Some(item) = bop_shared_state.bid_scheduled_items.get(args_usize) {
                 item.item_kind.get_item_name()
             } else {
@@ -225,16 +187,9 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..2 {
-        fn player_status(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
-            let hp = bop_shared_state.players[args_usize]
-                .player_state
-                .current_hp;
-            let max_hp = bop_shared_state.players[args_usize]
-                .player_state
-                .max_hp;
+        fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+            let hp = bop_shared_state.players[args_usize].player_state.current_hp;
+            let max_hp = bop_shared_state.players[args_usize].player_state.max_hp;
             format!("{}/{}", hp, max_hp)
         }
         binds.push(SimpleBinder::new(
@@ -247,10 +202,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..2 {
-        fn player_status(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
+        fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             let attack_point = bop_shared_state.players[args_usize]
                 .player_state
                 .attack_point;
@@ -266,10 +218,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..2 {
-        fn player_status(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
+        fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             let defence_point = bop_shared_state.players[args_usize]
                 .player_state
                 .defence_point;
@@ -285,12 +234,8 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..2 {
-        fn use_item_cursor(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
-            if bop_shared_state.phase_index == 2
-                && bop_shared_state.own_player_index == args_usize
+        fn use_item_cursor(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+            if bop_shared_state.phase_index == 2 && bop_shared_state.own_player_index == args_usize
             {
                 "👉".to_string()
             } else {
@@ -308,10 +253,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
 
     for n in 0..2 {
-        fn initiative(
-            bop_shared_state: &mut BoPSharedState,
-            args_usize: usize,
-        ) -> String {
+        fn initiative(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             if bop_shared_state.initiatives_to_player_index[0] == args_usize {
                 "先攻"
             } else {

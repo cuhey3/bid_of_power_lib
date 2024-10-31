@@ -1,6 +1,6 @@
 use crate::bop::cpu_player::CPUPlayer;
 use crate::bop::state::message::{
-    AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, GameStateMessage, UseCardMessage,
+    AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, UseCardMessage,
 };
 use crate::engine::application_types::SceneType::BoPGameMain;
 use crate::engine::application_types::StateType::BoPShared;
@@ -8,7 +8,6 @@ use crate::engine::input::Input;
 use crate::engine::scene::Scene;
 use crate::engine::state::State;
 use crate::features::animation::Animation;
-use crate::features::websocket::{ChannelMessage, MessageType};
 use crate::svg::element_wrapper::ElementWrapper;
 use crate::svg::svg_renderer::{Cursor, SvgRenderer};
 use wasm_bindgen_test::console_log;
@@ -64,7 +63,8 @@ impl GameMainState {
             consume_func,
             init_func,
             update_map_func: Scene::create_update_map_func_empty(),
-            consume_channel_message_func: game_main_state.create_consume_channel_message_func(),
+            // consume_channel_message_func: game_main_state.create_consume_channel_message_func(),
+            on_update_state_func: game_main_state.create_on_update_state_func(),
             scene_type: BoPGameMain(game_main_state),
         }
     }
@@ -155,8 +155,7 @@ impl GameMainState {
                                         to_send_channel_messages.push(
                                             serde_json::to_string(&BidMessage {
                                                 seq_no: bop_shared_state.get_seq_no_to_send(),
-                                                player_index: bop_shared_state
-                                                    .own_player_index,
+                                                player_index: bop_shared_state.own_player_index,
                                                 bid_item_index: cursor_index,
                                                 bid_amount: bop_shared_state.bid_input
                                                     [cursor_index]
@@ -169,14 +168,12 @@ impl GameMainState {
                                     game_main_state.renderers[1].hide();
                                     game_main_state.renderers[1].cursor.reset();
                                 } else {
-                                    let item_name = bop_shared_state.items_bid_on
-                                        [cursor_index]
+                                    let item_name = bop_shared_state.items_bid_on[cursor_index]
                                         .item_kind
                                         .get_item_name();
                                     let amount =
                                         bop_shared_state.bid_input[cursor_index].bid_amount;
-                                    if bop_shared_state.players
-                                        [bop_shared_state.own_player_index]
+                                    if bop_shared_state.players[bop_shared_state.own_player_index]
                                         .player_state
                                         .current_money_amount
                                         < amount
@@ -232,8 +229,7 @@ impl GameMainState {
                                                 seq_no: bop_shared_state.get_seq_no_to_send(),
                                                 turn: bop_shared_state.turn,
                                                 check_is_blocked: false,
-                                                player_index: bop_shared_state
-                                                    .own_player_index,
+                                                player_index: bop_shared_state.own_player_index,
                                                 use_item_index: cursor_index,
                                                 is_skipped: false,
                                                 args_i32: vec![],
@@ -252,8 +248,7 @@ impl GameMainState {
                                                 seq_no: bop_shared_state.get_seq_no_to_send(),
                                                 turn: bop_shared_state.turn,
                                                 check_is_blocked: false,
-                                                player_index: bop_shared_state
-                                                    .own_player_index,
+                                                player_index: bop_shared_state.own_player_index,
                                                 use_item_index: 0,
                                                 is_skipped: true,
                                                 args_i32: vec![],
@@ -333,224 +328,19 @@ impl GameMainState {
         }
         consume_func
     }
-    pub fn create_consume_channel_message_func(
-        &mut self,
-    ) -> fn(&mut Scene, &mut State, message: &ChannelMessage) {
-        fn consume_channel_message(
-            scene: &mut Scene,
-            shared_state: &mut State,
-            message: &ChannelMessage,
-        ) {
+
+    pub fn create_on_update_state_func(&mut self) -> fn(&mut Scene, &mut State) {
+        fn on_update_state_func(scene: &mut Scene, shared_state: &mut State) {
             if let Scene {
                 scene_type: BoPGameMain(game_main_state),
                 ..
             } = scene
             {
-                console_log!("consume_channel_message start {}", message.message);
                 if let State {
                     state_type: BoPShared(bop_shared_state),
-                    interrupt_animations,
                     ..
                 } = shared_state
                 {
-                    match message.message_type {
-                        MessageType::Join => {
-                            console_log!("enter join message logic {:?}", message);
-                            if message.user_name == shared_state.user_name
-                                && bop_shared_state.consumed_seq_no != 0
-                            {
-                                // 自分が復帰したことを相手に知らせる
-                                shared_state.to_send_channel_messages.push(
-                                    serde_json::to_string(&GameStateMessage {
-                                        player_index: bop_shared_state.own_player_index,
-                                        last_consumed_seq_no: bop_shared_state
-                                            .consumed_seq_no,
-                                    })
-                                    .unwrap(),
-                                )
-                            }
-                            console_log!("complete join message logic {:?}", message);
-                        }
-                        MessageType::Message => {
-                            console_log!("enter main message logic {:?}", message);
-                            if let Ok(message) =
-                                serde_json::from_str::<GameStateMessage>(&message.message)
-                            {
-                                console_log!("enter game state message logic {:?}", message);
-                                if message.player_index == bop_shared_state.phase_index
-                                    || bop_shared_state.consumed_seq_no
-                                        == message.last_consumed_seq_no
-                                {
-                                    // 自分のメッセージ、または同期が取れているものは無視
-                                    // empty
-                                } else {
-                                    let last_consumed = message.last_consumed_seq_no;
-                                    for n in last_consumed + 1
-                                        ..bop_shared_state.consumed_seq_no + 1
-                                    {
-                                        if let Some(found) = bop_shared_state
-                                            .temporary_bid_history
-                                            .iter()
-                                            .find(|message| message.seq_no == n)
-                                        {
-                                            shared_state
-                                                .to_send_channel_messages
-                                                .push(serde_json::to_string(found).unwrap());
-                                        };
-                                        if let Some(found) = bop_shared_state
-                                            .bid_history
-                                            .iter()
-                                            .find(|message| message.seq_no == n)
-                                        {
-                                            shared_state
-                                                .to_send_channel_messages
-                                                .push(serde_json::to_string(found).unwrap());
-                                        };
-                                        if let Some(found) = bop_shared_state
-                                            .use_item_history
-                                            .iter()
-                                            .find(|message| message.seq_no == n)
-                                        {
-                                            shared_state
-                                                .to_send_channel_messages
-                                                .push(serde_json::to_string(found).unwrap());
-                                        };
-                                        if let Some(found) = bop_shared_state
-                                            .attack_target_history
-                                            .iter()
-                                            .find(|message| message.seq_no == n)
-                                        {
-                                            shared_state
-                                                .to_send_channel_messages
-                                                .push(serde_json::to_string(found).unwrap());
-                                        };
-                                    }
-                                }
-                                console_log!("complete game state message logic {:?}", message);
-                            } else if let Ok(message) =
-                                serde_json::from_str::<GameStartIsApprovedMessage>(&message.message)
-                            {
-                                console_log!(
-                                    "enter game start is approved message logic {:?}",
-                                    message
-                                );
-                                bop_shared_state.players[message.player_index]
-                                    .game_start_is_approved = message.game_start_is_approved;
-                                console_log!(
-                                    "complete game start is approved message logic {:?}",
-                                    message
-                                );
-                            } else if let Ok(message) =
-                                serde_json::from_str::<BidMessage>(&message.message)
-                            {
-                                console_log!("enter bid message logic {:?}", message);
-                                if !bop_shared_state.check_and_update_seq_no(
-                                    message.seq_no,
-                                    message.player_index == bop_shared_state.own_player_index,
-                                ) {
-                                    return;
-                                }
-                                bop_shared_state.temporary_bid_history.push(message);
-                                BidMessage::ready_bid_input(
-                                    &mut bop_shared_state.bid_input,
-                                    &bop_shared_state.temporary_bid_history,
-                                );
-                                console_log!("complete bid message logic");
-                            } else if let Ok(message) =
-                                serde_json::from_str::<UseCardMessage>(&message.message)
-                            {
-                                console_log!("enter use item message logic {:?}", message);
-                                if !bop_shared_state.check_and_update_seq_no(
-                                    message.seq_no,
-                                    message.player_index == bop_shared_state.own_player_index,
-                                ) {
-                                    return;
-                                }
-                                console_log!("use item logic 1");
-                                if !message.is_skipped {
-                                    let item = bop_shared_state.players[message.player_index]
-                                        .own_item_list
-                                        .remove(message.use_item_index);
-                                    console_log!("use item logic 2");
-                                    let mut item_use_functions =
-                                        item.get_use_func(message.player_index);
-                                    item_use_functions(bop_shared_state);
-                                }
-                                console_log!("use item logic 3");
-                                bop_shared_state.use_item_history.push(message);
-                                console_log!("complete use item message logic");
-                            } else if let Ok(message) =
-                                serde_json::from_str::<AttackTargetMessage>(&message.message)
-                            {
-                                console_log!("enter attack target message logic {:?}", message);
-                                if !bop_shared_state.check_and_update_seq_no(
-                                    message.seq_no,
-                                    message.player_index == bop_shared_state.own_player_index,
-                                ) {
-                                    return;
-                                }
-                                if message.is_skipped {
-                                    bop_shared_state.players[message.player_index]
-                                        .player_state
-                                        .current_money_amount += 1;
-                                    interrupt_animations.push(vec![Animation::create_message(
-                                        format!(
-                                            "{}さんは 1 Moneyを得た",
-                                            bop_shared_state.players[message.player_index]
-                                                .player_name
-                                        ),
-                                        true,
-                                    )])
-                                } else {
-                                    let opponent_player_index = (message.player_index + 1)
-                                        % bop_shared_state.players.iter().len();
-                                    let opponent_player_defence_point = bop_shared_state
-                                        .players[opponent_player_index]
-                                        .player_state
-                                        .defence_point;
-                                    let player_attack_point = bop_shared_state.players
-                                        [message.player_index]
-                                        .player_state
-                                        .attack_point;
-                                    let damage = if player_attack_point == 0 {
-                                        0
-                                    } else if opponent_player_defence_point >= player_attack_point {
-                                        1
-                                    } else {
-                                        player_attack_point - opponent_player_defence_point
-                                    };
-                                    if damage
-                                        >= bop_shared_state.players[opponent_player_index]
-                                            .player_state
-                                            .current_hp
-                                    {
-                                        bop_shared_state.players[opponent_player_index]
-                                            .player_state
-                                            .current_hp = 0;
-                                    } else {
-                                        bop_shared_state.players[opponent_player_index]
-                                            .player_state
-                                            .current_hp -= damage;
-                                    }
-                                    interrupt_animations.push(vec![Animation::create_message(
-                                        format!(
-                                            "{}さんに{}のダメージ（残りHP: {}）",
-                                            bop_shared_state.players[opponent_player_index]
-                                                .player_name,
-                                            damage,
-                                            bop_shared_state.players[opponent_player_index]
-                                                .player_state
-                                                .current_hp,
-                                        ),
-                                        true,
-                                    )]);
-                                }
-                                bop_shared_state.attack_target_history.push(message);
-                                console_log!("complete attack target message logic");
-                            }
-                        }
-                        _ => {}
-                    }
                     let check_result =
                         bop_shared_state.check_phase_complete(shared_state.is_matched);
                     game_main_state.renderers[0].cursor.reset();
@@ -601,10 +391,10 @@ impl GameMainState {
                     game_main_state.renderers[0].render(item_names, item_descriptions, "");
                     match bop_shared_state.phase_index {
                         3 => {
-                            let opponent_player_name = &bop_shared_state.players
-                                [(bop_shared_state.own_player_index + 1)
+                            let opponent_player_name =
+                                &bop_shared_state.players[(bop_shared_state.own_player_index + 1)
                                     % bop_shared_state.players.len()]
-                            .player_name;
+                                .player_name;
                             if !bop_shared_state.input_is_guard {
                                 game_main_state.renderers[2].render(
                                     vec![
@@ -614,8 +404,7 @@ impl GameMainState {
                                     vec![],
                                     format!(
                                         "{}さん、攻撃対象を選んでください。",
-                                        bop_shared_state.players
-                                            [bop_shared_state.own_player_index]
+                                        bop_shared_state.players[bop_shared_state.own_player_index]
                                             .player_name
                                     )
                                     .as_str(),
@@ -627,6 +416,6 @@ impl GameMainState {
                 }
             }
         }
-        consume_channel_message
+        on_update_state_func
     }
 }

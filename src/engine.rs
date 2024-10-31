@@ -121,9 +121,10 @@ impl Engine {
         console_log!("receive_channel_message {}", message);
         if !self.shared_state.is_request_matching {
             channel_message.message = message;
+            self.shared_state.consume_channel_message(channel_message);
             for scene in self.scenes.iter_mut() {
-                let consume_channel_message_func = scene.consume_channel_message_func;
-                consume_channel_message_func(scene, &mut self.shared_state, &channel_message);
+                let on_update_state_func = scene.on_update_state_func;
+                on_update_state_func(scene, &mut self.shared_state);
             }
             return;
         }
@@ -155,18 +156,13 @@ impl Engine {
                         if message.host_player_name != self.shared_state.user_name
                             && message.guest_player_name == self.shared_state.user_name
                         {
-                            if let BoPShared(bop_shared_state) =
-                                &mut self.shared_state.state_type
-                            {
+                            if let BoPShared(bop_shared_state) = &mut self.shared_state.state_type {
                                 bop_shared_state.update_item_list(message.item_kind_list);
-                                bop_shared_state.own_player_index =
-                                    message.guest_player_index;
+                                bop_shared_state.own_player_index = message.guest_player_index;
                                 console_log!("you are guest.");
                             }
                         } else if message.host_player_name == self.shared_state.user_name {
-                            if let BoPShared(bop_shared_state) =
-                                &mut self.shared_state.state_type
-                            {
+                            if let BoPShared(bop_shared_state) = &mut self.shared_state.state_type {
                                 bop_shared_state.update_item_list(message.item_kind_list);
                                 bop_shared_state.own_player_index = message.host_player_index;
                                 console_log!("you are host.");

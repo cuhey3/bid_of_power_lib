@@ -269,10 +269,7 @@ impl Item {
             }
         }
     }
-    pub fn get_use_func(
-        &self,
-        use_player_index: usize,
-    ) -> Box<dyn FnMut(&mut BoPSharedState)> {
+    pub fn get_use_func(&self, use_player_index: usize) -> Box<dyn FnMut(&mut BoPSharedState)> {
         match self.item_kind {
             Dagger => Box::new(Item::create_update_status_func(
                 use_player_index,

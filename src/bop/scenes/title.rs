@@ -35,7 +35,7 @@ impl TitleState {
             consume_func,
             init_func,
             update_map_func: Scene::create_update_map_func_empty(),
-            consume_channel_message_func: Scene::create_consume_channel_message_func_empty(),
+            on_update_state_func: Scene::create_on_update_state_func_empty(),
         }
     }
     pub fn create_init_func(&self) -> fn(&mut Scene, &mut State) {

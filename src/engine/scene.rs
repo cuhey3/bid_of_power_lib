@@ -11,8 +11,7 @@ pub struct Scene {
     pub consume_func: fn(scene: &mut Scene, shared_state: &mut State, input: Input),
     pub init_func: fn(scene: &mut Scene, shared_state: &mut State),
     pub update_map_func: fn(scene: &mut Scene, shared_state: &mut State),
-    pub consume_channel_message_func:
-        fn(scene: &mut Scene, shared_state: &mut State, message: &ChannelMessage),
+    pub on_update_state_func: fn(scene: &mut Scene, shared_state: &mut State),
 }
 
 impl Scene {
@@ -33,5 +32,9 @@ impl Scene {
     {
         fn consume_channel_message_func(_: &mut Scene, _: &mut State, _: &ChannelMessage) {}
         consume_channel_message_func
+    }
+    pub fn create_on_update_state_func_empty() -> fn(&mut Scene, &mut State) {
+        fn update_on_update_state_func(_: &mut Scene, _: &mut State) {}
+        update_on_update_state_func
     }
 }
