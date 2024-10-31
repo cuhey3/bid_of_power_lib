@@ -1,17 +1,17 @@
 use crate::bop::scenes::game_main::GameMainState;
 use crate::bop::state::bind::get_binds;
-use crate::bop::state::card_game_shared_state::CardGamePlayer;
+use crate::bop::state::bop_shared_state::BoPPlayer;
 use crate::engine::application_types::StateType;
 use crate::engine::state::{Primitives, References, State};
 use crate::engine::Engine;
 use crate::features::animation::Animation;
 use crate::features::websocket::WebSocketWrapper;
 use crate::svg::SharedElements;
-use mechanism::card::Card;
+use mechanism::item::Item;
 use mechanism::player_state::PlayerState;
 use rand::Rng;
 use scenes::title::TitleState;
-use state::card_game_shared_state::CardGameSharedState;
+use state::bop_shared_state::BoPSharedState;
 use state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use state::phase::Phase;
 use std::cell::RefCell;
@@ -27,35 +27,35 @@ pub fn mount() -> Engine {
     let random_number = rng.random::<u16>();
     let user_name = random_number.to_string();
 
-    let rpg_shared_state = CardGameSharedState {
+    let rpg_shared_state = BoPSharedState {
         players: vec![
-            CardGamePlayer {
+            BoPPlayer {
                 player_name: "プレイヤー1".to_string(),
                 game_start_is_approved: false,
                 battle_is_viewed: false,
-                own_card_list: vec![],
+                own_item_list: vec![],
                 player_state: PlayerState::init(),
             },
-            CardGamePlayer {
+            BoPPlayer {
                 player_name: "プレイヤー2".to_string(),
                 game_start_is_approved: false,
                 battle_is_viewed: false,
-                own_card_list: vec![],
+                own_item_list: vec![],
                 player_state: PlayerState::init(),
             },
         ],
         own_player_index: 0,
-        cards_bid_on: vec![],
+        items_bid_on: vec![],
         bid_input: vec![
             BidMessage::init(0),
             BidMessage::init(1),
             BidMessage::init(2),
         ],
-        bid_scheduled_cards: Card::card_set_default(),
+        bid_scheduled_items: Item::item_set_default(),
         temporary_bid_history: vec![],
         bid_history: vec![],
-        use_card_input: UseCardMessage::empty(),
-        use_card_history: vec![],
+        use_item_input: UseCardMessage::empty(),
+        use_item_history: vec![],
         attack_target_input: AttackTargetMessage::empty(),
         attack_target_history: vec![],
         initiatives_to_player_index: vec![0, 1],

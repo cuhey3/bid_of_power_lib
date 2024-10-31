@@ -1,31 +1,31 @@
-use crate::bop::mechanism::card::CardKind::{
+use crate::bop::mechanism::item::ItemKind::{
     ATKSwap, ArmourBreak, Balance, BuildUp, ChainMail, Chaos, Cure, DEFSwap, Dagger, Excalibur,
     GainUp, GoldenDagger, GoldenHeal, GoldenSkin, HPSwap, LeatherArmour, LongSword, MagicBolt,
     Shrink, Treasure, Weakness,
 };
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::bop_shared_state::BoPSharedState;
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen_test::console_log;
 
 #[derive(Clone, Debug)]
-pub struct Card {
+pub struct Item {
     pub sold_for: u32,
     pub is_used: bool,
-    pub card_kind: CardKind,
+    pub item_kind: ItemKind,
 }
 
-impl Card {
-    pub fn from(card_kind: CardKind) -> Card {
-        Card {
+impl Item {
+    pub fn from(item_kind: ItemKind) -> Item {
+        Item {
             sold_for: 0,
             is_used: false,
-            card_kind,
+            item_kind,
         }
     }
-    pub fn card_set_default() -> Vec<Card> {
+    pub fn item_set_default() -> Vec<Item> {
         let mut rng = rand::thread_rng();
-        let mut cards = vec![
+        let mut items = vec![
             Treasure,
             GoldenSkin,
             Chaos,
@@ -49,11 +49,11 @@ impl Card {
             MagicBolt,
         ]
         .into_iter()
-        .map(|card_kind| Card::from(card_kind))
-        .collect::<Vec<Card>>();
-        cards.shuffle(&mut rng);
-        cards.push(Card::from(Excalibur));
-        cards
+        .map(|item_kind| Item::from(item_kind))
+        .collect::<Vec<Item>>();
+        items.shuffle(&mut rng);
+        items.push(Item::from(Excalibur));
+        items
     }
 
     pub fn create_update_status_func(
@@ -61,14 +61,14 @@ impl Card {
         target_is_own: bool,
         status: String,
         amount: i32,
-    ) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| {
+    ) -> impl FnMut(&mut BoPSharedState) {
+        move |item_game_shared_state: &mut BoPSharedState| {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % card_game_shared_state.players.len()
+                (use_player_index + 1) % item_game_shared_state.players.len()
             };
-            let state = &mut card_game_shared_state.players[target_player_index].player_state;
+            let state = &mut item_game_shared_state.players[target_player_index].player_state;
             match status.as_str() {
                 "ATK" => state.attack_point = (state.attack_point as i32 + amount).max(0) as u32,
                 "DEF" => state.defence_point = (state.defence_point as i32 + amount).max(0) as u32,
@@ -97,14 +97,14 @@ impl Card {
         target_is_own: bool,
         status: String,
         scale: f64,
-    ) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| {
+    ) -> impl FnMut(&mut BoPSharedState) {
+        move |bop_shared_state: &mut BoPSharedState| {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % card_game_shared_state.players.len()
+                (use_player_index + 1) % bop_shared_state.players.len()
             };
-            let state = &mut card_game_shared_state.players[target_player_index].player_state;
+            let state = &mut bop_shared_state.players[target_player_index].player_state;
             match status.as_str() {
                 "ATK" => {
                     state.attack_point +=
@@ -130,29 +130,29 @@ impl Card {
     }
     // HP/MHP は一度に処理する
     // プレイヤーの入力を取れないうちはプレイヤー1と2に固定
-    pub fn create_swap_status_func(status: String) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| match status.as_str() {
+    pub fn create_swap_status_func(status: String) -> impl FnMut(&mut BoPSharedState) {
+        move |bop_shared_state: &mut BoPSharedState| match status.as_str() {
             "ATK" => {
-                let state_a_amount = card_game_shared_state.players[0].player_state.attack_point;
-                let state_b_amount = card_game_shared_state.players[1].player_state.attack_point;
-                card_game_shared_state.players[0].player_state.attack_point = state_b_amount;
-                card_game_shared_state.players[1].player_state.attack_point = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_state.attack_point;
+                let state_b_amount = bop_shared_state.players[1].player_state.attack_point;
+                bop_shared_state.players[0].player_state.attack_point = state_b_amount;
+                bop_shared_state.players[1].player_state.attack_point = state_a_amount;
             }
             "DEF" => {
-                let state_a_amount = card_game_shared_state.players[0].player_state.defence_point;
-                let state_b_amount = card_game_shared_state.players[1].player_state.defence_point;
-                card_game_shared_state.players[0].player_state.defence_point = state_b_amount;
-                card_game_shared_state.players[1].player_state.defence_point = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_state.defence_point;
+                let state_b_amount = bop_shared_state.players[1].player_state.defence_point;
+                bop_shared_state.players[0].player_state.defence_point = state_b_amount;
+                bop_shared_state.players[1].player_state.defence_point = state_a_amount;
             }
             "HP" | "MHP" => {
-                let state_a_amount = card_game_shared_state.players[0].player_state.max_hp;
-                let state_b_amount = card_game_shared_state.players[1].player_state.max_hp;
-                card_game_shared_state.players[0].player_state.max_hp = state_b_amount;
-                card_game_shared_state.players[1].player_state.max_hp = state_a_amount;
-                let state_a_amount = card_game_shared_state.players[0].player_state.current_hp;
-                let state_b_amount = card_game_shared_state.players[1].player_state.current_hp;
-                card_game_shared_state.players[0].player_state.current_hp = state_b_amount;
-                card_game_shared_state.players[1].player_state.current_hp = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_state.max_hp;
+                let state_b_amount = bop_shared_state.players[1].player_state.max_hp;
+                bop_shared_state.players[0].player_state.max_hp = state_b_amount;
+                bop_shared_state.players[1].player_state.max_hp = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_state.current_hp;
+                let state_b_amount = bop_shared_state.players[1].player_state.current_hp;
+                bop_shared_state.players[0].player_state.current_hp = state_b_amount;
+                bop_shared_state.players[1].player_state.current_hp = state_a_amount;
             }
             _ => {
                 panic!()
@@ -163,14 +163,14 @@ impl Card {
         use_player_index: usize,
         target_is_own: bool,
         status: String,
-    ) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| {
+    ) -> impl FnMut(&mut BoPSharedState) {
+        move |bop_shared_state: &mut BoPSharedState| {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % card_game_shared_state.players.len()
+                (use_player_index + 1) % bop_shared_state.players.len()
             };
-            let state = &mut card_game_shared_state.players[target_player_index].player_state;
+            let state = &mut bop_shared_state.players[target_player_index].player_state;
             match status.as_str() {
                 "ATK" => state.attack_point /= 2,
                 "DEF" => state.defence_point /= 2,
@@ -190,15 +190,15 @@ impl Card {
         status_b: String,
         is_balance: bool,
         modifier: i32,
-    ) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| {
+    ) -> impl FnMut(&mut BoPSharedState) {
+        move |bop_shared_state: &mut BoPSharedState| {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % card_game_shared_state.players.len()
+                (use_player_index + 1) % bop_shared_state.players.len()
             };
             let target_player_status =
-                &mut card_game_shared_state.players[target_player_index].player_state;
+                &mut bop_shared_state.players[target_player_index].player_state;
             let status_a_amount = match status_a.as_str() {
                 "HP" => target_player_status.current_hp,
                 "MHP" => target_player_status.max_hp,
@@ -261,89 +261,89 @@ impl Card {
         }
     }
     pub fn combine_func(
-        mut functions: Vec<Box<dyn FnMut(&mut CardGameSharedState)>>,
-    ) -> impl FnMut(&mut CardGameSharedState) {
-        move |card_game_shared_state: &mut CardGameSharedState| {
+        mut functions: Vec<Box<dyn FnMut(&mut BoPSharedState)>>,
+    ) -> impl FnMut(&mut BoPSharedState) {
+        move |bop_shared_state: &mut BoPSharedState| {
             for func in functions.iter_mut() {
-                func(card_game_shared_state)
+                func(bop_shared_state)
             }
         }
     }
     pub fn get_use_func(
         &self,
         use_player_index: usize,
-    ) -> Box<dyn FnMut(&mut CardGameSharedState)> {
-        match self.card_kind {
-            Dagger => Box::new(Card::create_update_status_func(
+    ) -> Box<dyn FnMut(&mut BoPSharedState)> {
+        match self.item_kind {
+            Dagger => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "ATK".to_string(),
                 5,
             )),
-            LongSword => Box::new(Card::create_update_status_func(
+            LongSword => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "ATK".to_string(),
                 10,
             )),
-            BuildUp => Box::new(Card::combine_func(vec![
-                Box::new(Card::create_update_status_func(
+            BuildUp => Box::new(Item::combine_func(vec![
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "MHP".to_string(),
                     10,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "HP".to_string(),
                     10,
                 )),
             ])),
-            GainUp => Box::new(Card::create_update_status_func(
+            GainUp => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "Gain".to_string(),
                 1,
             )),
-            ArmourBreak => Box::new(Card::create_cut_status_func(
+            ArmourBreak => Box::new(Item::create_cut_status_func(
                 use_player_index,
                 false,
                 "DEF".to_string(),
             )),
-            Weakness => Box::new(Card::create_cut_status_func(
+            Weakness => Box::new(Item::create_cut_status_func(
                 use_player_index,
                 false,
                 "ATK".to_string(),
             )),
-            LeatherArmour => Box::new(Card::create_update_status_func(
+            LeatherArmour => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "DEF".to_string(),
                 5,
             )),
-            ChainMail => Box::new(Card::create_update_status_func(
+            ChainMail => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "DEF".to_string(),
                 10,
             )),
-            MagicBolt => Box::new(Card::create_update_status_func(
+            MagicBolt => Box::new(Item::create_update_status_func(
                 use_player_index,
                 false,
                 "HP".to_string(),
                 -15,
             )),
-            Cure => Box::new(Card::create_update_status_func(
+            Cure => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "HP".to_string(),
                 20,
             )),
-            HPSwap => Box::new(Card::create_swap_status_func("HP".to_string())),
-            ATKSwap => Box::new(Card::create_swap_status_func("ATK".to_string())),
-            DEFSwap => Box::new(Card::create_swap_status_func("DEF".to_string())),
-            Balance => Box::new(Card::create_balance_func(
+            HPSwap => Box::new(Item::create_swap_status_func("HP".to_string())),
+            ATKSwap => Box::new(Item::create_swap_status_func("ATK".to_string())),
+            DEFSwap => Box::new(Item::create_swap_status_func("DEF".to_string())),
+            Balance => Box::new(Item::create_balance_func(
                 use_player_index,
                 true,
                 "ATK".to_string(),
@@ -351,7 +351,7 @@ impl Card {
                 true,
                 1,
             )),
-            Shrink => Box::new(Card::create_balance_func(
+            Shrink => Box::new(Item::create_balance_func(
                 use_player_index,
                 false,
                 "ATK".to_string(),
@@ -359,82 +359,82 @@ impl Card {
                 false,
                 -1,
             )),
-            GoldenDagger => Box::new(Card::create_update_status_golden_func(
+            GoldenDagger => Box::new(Item::create_update_status_golden_func(
                 use_player_index,
                 true,
                 "ATK".to_string(),
                 1.0,
             )),
-            GoldenSkin => Box::new(Card::create_update_status_golden_func(
+            GoldenSkin => Box::new(Item::create_update_status_golden_func(
                 use_player_index,
                 true,
                 "DEF".to_string(),
                 1.0,
             )),
-            GoldenHeal => Box::new(Card::create_update_status_golden_func(
+            GoldenHeal => Box::new(Item::create_update_status_golden_func(
                 use_player_index,
                 true,
                 "HP".to_string(),
                 2.0,
             )),
-            Treasure => Box::new(Card::create_update_status_func(
+            Treasure => Box::new(Item::create_update_status_func(
                 use_player_index,
                 true,
                 "Money".to_string(),
                 5,
             )),
-            Chaos => Box::new(Card::combine_func(vec![
-                Box::new(Card::create_update_status_func(
+            Chaos => Box::new(Item::combine_func(vec![
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "HP".to_string(),
                     -5,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     false,
                     "HP".to_string(),
                     -5,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "ATK".to_string(),
                     5,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     false,
                     "ATK".to_string(),
                     5,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "DEF".to_string(),
                     -5,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     false,
                     "DEF".to_string(),
                     -5,
                 )),
             ])),
-            Excalibur => Box::new(Card::combine_func(vec![
-                Box::new(Card::create_update_status_func(
+            Excalibur => Box::new(Item::combine_func(vec![
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "HP".to_string(),
                     10,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "ATK".to_string(),
                     10,
                 )),
-                Box::new(Card::create_update_status_func(
+                Box::new(Item::create_update_status_func(
                     use_player_index,
                     true,
                     "DEF".to_string(),
@@ -446,7 +446,7 @@ impl Card {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CardKind {
+pub enum ItemKind {
     LongSword,
     LeatherArmour,
     Dagger,
@@ -470,8 +470,8 @@ pub enum CardKind {
     Excalibur,
 }
 
-impl CardKind {
-    pub fn get_card_name(&self) -> String {
+impl ItemKind {
+    pub fn get_item_name(&self) -> String {
         match self {
             LongSword => "ロングソード",
             LeatherArmour => "レザーアーマー",
@@ -497,7 +497,7 @@ impl CardKind {
         }
         .to_string()
     }
-    pub fn get_card_description(&self) -> String {
+    pub fn get_item_description(&self) -> String {
         match self {
             LongSword => "自己ATK+10",
             LeatherArmour => "自己DEF+5",

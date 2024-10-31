@@ -155,20 +155,20 @@ impl Engine {
                         if message.host_player_name != self.shared_state.user_name
                             && message.guest_player_name == self.shared_state.user_name
                         {
-                            if let BoPShared(card_game_shared_state) =
+                            if let BoPShared(bop_shared_state) =
                                 &mut self.shared_state.state_type
                             {
-                                card_game_shared_state.update_card_list(message.card_kind_list);
-                                card_game_shared_state.own_player_index =
+                                bop_shared_state.update_item_list(message.item_kind_list);
+                                bop_shared_state.own_player_index =
                                     message.guest_player_index;
                                 console_log!("you are guest.");
                             }
                         } else if message.host_player_name == self.shared_state.user_name {
-                            if let BoPShared(card_game_shared_state) =
+                            if let BoPShared(bop_shared_state) =
                                 &mut self.shared_state.state_type
                             {
-                                card_game_shared_state.update_card_list(message.card_kind_list);
-                                card_game_shared_state.own_player_index = message.host_player_index;
+                                bop_shared_state.update_item_list(message.item_kind_list);
+                                bop_shared_state.own_player_index = message.host_player_index;
                                 console_log!("you are host.");
                             }
                         } else {
@@ -278,15 +278,15 @@ impl Engine {
             }
         }
         if let State {
-            state_type: BoPShared(card_game_shared_state),
+            state_type: BoPShared(bop_shared_state),
             ..
         } = &mut self.shared_state
         {
-            for n in 0..card_game_shared_state.simple_binders.len() {
+            for n in 0..bop_shared_state.simple_binders.len() {
                 // 自己参照を含んでいるので一旦 SimpleBinder の clone をして、戻す
-                let mut binder = card_game_shared_state.simple_binders[n].clone();
-                let binder = binder.sync(card_game_shared_state);
-                card_game_shared_state.simple_binders[n] = binder.clone();
+                let mut binder = bop_shared_state.simple_binders[n].clone();
+                let binder = binder.sync(bop_shared_state);
+                bop_shared_state.simple_binders[n] = binder.clone();
             }
         }
     }

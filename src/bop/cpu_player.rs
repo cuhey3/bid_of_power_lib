@@ -1,36 +1,36 @@
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::bop_shared_state::BoPSharedState;
 use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use rand::{thread_rng, Rng};
 use wasm_bindgen_test::console_log;
 
 pub struct CPUPlayer {
-    pub card_game_shared_state: CardGameSharedState,
+    pub bop_shared_state: BoPSharedState,
 }
 
 impl CPUPlayer {
     pub fn create_cpu_message(&mut self, index: usize) -> String {
-        let player_index = self.card_game_shared_state.own_player_index;
-        let opponent_player_index = (player_index + 1) % self.card_game_shared_state.players.len();
-        let turn = self.card_game_shared_state.turn;
-        let seq_no = self.card_game_shared_state.consumed_seq_no + 1;
-        match self.card_game_shared_state.phase_index {
+        let player_index = self.bop_shared_state.own_player_index;
+        let opponent_player_index = (player_index + 1) % self.bop_shared_state.players.len();
+        let turn = self.bop_shared_state.turn;
+        let seq_no = self.bop_shared_state.consumed_seq_no + 1;
+        match self.bop_shared_state.phase_index {
             1 => serde_json::to_string(&BidMessage {
                 seq_no,
                 player_index,
-                bid_card_index: index,
-                bid_amount: self.card_game_shared_state.bid_input[index].bid_amount,
+                bid_item_index: index,
+                bid_amount: self.bop_shared_state.bid_input[index].bid_amount,
             })
             .unwrap(),
             2 => {
-                let item_len = self.card_game_shared_state.players[player_index]
-                    .own_card_list
+                let item_len = self.bop_shared_state.players[player_index]
+                    .own_item_list
                     .len();
                 serde_json::to_string(&UseCardMessage {
                     seq_no,
                     turn,
                     check_is_blocked: false,
                     player_index,
-                    use_card_index: index,
+                    use_item_index: index,
                     is_skipped: index == item_len,
                     args_i32: vec![],
                     args_usize: vec![],
@@ -51,12 +51,12 @@ impl CPUPlayer {
             }
         }
     }
-    pub fn new(card_game_shared_state: &CardGameSharedState) -> CPUPlayer {
-        let card_game_shared_state = &mut card_game_shared_state.clone();
-        card_game_shared_state.players[0].game_start_is_approved = true;
-        card_game_shared_state.players[1].game_start_is_approved = true;
+    pub fn new(bop_shared_state: &BoPSharedState) -> CPUPlayer {
+        let bop_shared_state_cloned = &mut bop_shared_state.clone();
+        bop_shared_state_cloned.players[0].game_start_is_approved = true;
+        bop_shared_state_cloned.players[1].game_start_is_approved = true;
         CPUPlayer {
-            card_game_shared_state: card_game_shared_state.clone(),
+            bop_shared_state: bop_shared_state_cloned.clone(),
         }
     }
     pub fn simulate_multiple_times(
@@ -248,59 +248,59 @@ impl CPUPlayer {
         let mut random_inputs = vec![];
         let mut input_players = vec![];
         let mut rng = thread_rng();
-        let card_game_shared_state = &mut self.card_game_shared_state.clone();
-        card_game_shared_state.consumed_seq_no = 0;
+        let bop_shared_state = &mut self.bop_shared_state.clone();
+        bop_shared_state.consumed_seq_no = 0;
         loop {
-            let check_result = card_game_shared_state.check_phase_complete(false);
+            let check_result = bop_shared_state.check_phase_complete(false);
             if let Some(next_phase_index) = check_result.next_phase_index {
                 if next_phase_index == 4 {
-                    card_game_shared_state.phase_index = 4;
+                    bop_shared_state.phase_index = 4;
                     break;
                 }
             }
-            let player_index = card_game_shared_state.own_player_index;
-            let opponent_player_index = (player_index + 1) % card_game_shared_state.players.len();
-            let turn = card_game_shared_state.turn;
-            match card_game_shared_state.phase_index {
+            let player_index = bop_shared_state.own_player_index;
+            let opponent_player_index = (player_index + 1) % bop_shared_state.players.len();
+            let turn = bop_shared_state.turn;
+            match bop_shared_state.phase_index {
                 1 => {
-                    let biddable = card_game_shared_state
+                    let biddable = bop_shared_state
                         .bid_input
                         .iter()
                         .filter(|input| {
                             input.bid_amount
-                                <= card_game_shared_state.players[player_index]
+                                <= bop_shared_state.players[player_index]
                                     .player_state
                                     .current_money_amount
                         })
                         .collect::<Vec<&BidMessage>>();
                     let has_bid = biddable.iter().find(|input| input.bid_amount > 1);
                     let biddable_index = rng.gen_index(0..biddable.len());
-                    let mut bid_card_index = biddable[biddable_index].bid_card_index;
+                    let mut bid_item_index = biddable[biddable_index].bid_item_index;
                     if has_bid.is_some() {
-                        bid_card_index = if rng.gen_bool(0.3_f64) {
-                            has_bid.unwrap().bid_card_index
+                        bid_item_index = if rng.gen_bool(0.3_f64) {
+                            has_bid.unwrap().bid_item_index
                         } else {
-                            bid_card_index
+                            bid_item_index
                         };
                     }
                     if random_inputs.len() < 6 {
-                        random_inputs.push(bid_card_index);
+                        random_inputs.push(bid_item_index);
                         input_players.push(simulating_player == player_index);
                     }
                     CPUPlayer::headless_consume_message(
-                        card_game_shared_state,
+                        bop_shared_state,
                         serde_json::to_string(&BidMessage {
-                            seq_no: card_game_shared_state.consumed_seq_no + 1,
+                            seq_no: bop_shared_state.consumed_seq_no + 1,
                             player_index,
-                            bid_card_index,
-                            bid_amount: card_game_shared_state.bid_input[bid_card_index].bid_amount,
+                            bid_item_index,
+                            bid_amount: bop_shared_state.bid_input[bid_item_index].bid_amount,
                         })
                         .unwrap(),
                     );
                 }
                 2 => {
-                    let item_len = card_game_shared_state.players[player_index]
-                        .own_card_list
+                    let item_len = bop_shared_state.players[player_index]
+                        .own_item_list
                         .len();
                     let index = rng.gen_index(..item_len + 1);
                     if random_inputs.len() < 6 {
@@ -308,13 +308,13 @@ impl CPUPlayer {
                         input_players.push(simulating_player == player_index);
                     }
                     CPUPlayer::headless_consume_message(
-                        card_game_shared_state,
+                        bop_shared_state,
                         serde_json::to_string(&UseCardMessage {
-                            seq_no: card_game_shared_state.consumed_seq_no + 1,
+                            seq_no: bop_shared_state.consumed_seq_no + 1,
                             turn,
                             check_is_blocked: false,
                             player_index,
-                            use_card_index: index,
+                            use_item_index: index,
                             is_skipped: index == item_len,
                             args_i32: vec![],
                             args_usize: vec![],
@@ -329,9 +329,9 @@ impl CPUPlayer {
                         input_players.push(simulating_player == player_index);
                     }
                     CPUPlayer::headless_consume_message(
-                        card_game_shared_state,
+                        bop_shared_state,
                         serde_json::to_string(&AttackTargetMessage {
-                            seq_no: card_game_shared_state.consumed_seq_no + 1,
+                            seq_no: bop_shared_state.consumed_seq_no + 1,
                             turn,
                             player_index,
                             check_is_blocked: false,
@@ -347,45 +347,45 @@ impl CPUPlayer {
         (
             random_inputs,
             input_players,
-            card_game_shared_state.players[simulating_player]
+            bop_shared_state.players[simulating_player]
                 .player_state
                 .current_hp
                 != 0,
-            card_game_shared_state.consumed_seq_no,
+            bop_shared_state.consumed_seq_no,
         )
     }
     pub fn headless_consume_message(
-        card_game_shared_state: &mut CardGameSharedState,
+        bop_shared_state: &mut BoPSharedState,
         message: String,
     ) {
         if let Ok(message) = serde_json::from_str::<BidMessage>(&message) {
-            card_game_shared_state.temporary_bid_history.push(message);
+            bop_shared_state.temporary_bid_history.push(message);
             BidMessage::ready_bid_input(
-                &mut card_game_shared_state.bid_input,
-                &card_game_shared_state.temporary_bid_history,
+                &mut bop_shared_state.bid_input,
+                &bop_shared_state.temporary_bid_history,
             );
         } else if let Ok(message) = serde_json::from_str::<UseCardMessage>(&message) {
             if !message.is_skipped {
-                let card = card_game_shared_state.players[message.player_index]
-                    .own_card_list
-                    .remove(message.use_card_index);
-                let mut card_use_functions = card.get_use_func(message.player_index);
-                card_use_functions(card_game_shared_state);
+                let item = bop_shared_state.players[message.player_index]
+                    .own_item_list
+                    .remove(message.use_item_index);
+                let mut item_use_functions = item.get_use_func(message.player_index);
+                item_use_functions(bop_shared_state);
             }
-            card_game_shared_state.use_card_history.push(message);
+            bop_shared_state.use_item_history.push(message);
         } else if let Ok(message) = serde_json::from_str::<AttackTargetMessage>(&message) {
             if message.is_skipped {
-                card_game_shared_state.players[message.player_index]
+                bop_shared_state.players[message.player_index]
                     .player_state
                     .current_money_amount += 1;
             } else {
                 let opponent_player_index =
-                    (message.player_index + 1) % card_game_shared_state.players.iter().len();
-                let opponent_player_defence_point = card_game_shared_state.players
+                    (message.player_index + 1) % bop_shared_state.players.iter().len();
+                let opponent_player_defence_point = bop_shared_state.players
                     [opponent_player_index]
                     .player_state
                     .defence_point;
-                let player_attack_point = card_game_shared_state.players[message.player_index]
+                let player_attack_point = bop_shared_state.players[message.player_index]
                     .player_state
                     .attack_point;
                 let damage = if player_attack_point == 0 {
@@ -396,20 +396,20 @@ impl CPUPlayer {
                     player_attack_point - opponent_player_defence_point
                 };
                 if damage
-                    >= card_game_shared_state.players[opponent_player_index]
+                    >= bop_shared_state.players[opponent_player_index]
                         .player_state
                         .current_hp
                 {
-                    card_game_shared_state.players[opponent_player_index]
+                    bop_shared_state.players[opponent_player_index]
                         .player_state
                         .current_hp = 0;
                 } else {
-                    card_game_shared_state.players[opponent_player_index]
+                    bop_shared_state.players[opponent_player_index]
                         .player_state
                         .current_hp -= damage;
                 }
             }
-            card_game_shared_state.attack_target_history.push(message);
+            bop_shared_state.attack_target_history.push(message);
         }
     }
 }

@@ -1,9 +1,9 @@
 use crate::bop::scenes::game_main::GameMainState;
 use crate::bop::scenes::title::TitleState;
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::bop_shared_state::BoPSharedState;
 
 pub enum StateType {
-    BoPShared(CardGameSharedState),
+    BoPShared(BoPSharedState),
     TBDStateType,
 }
 

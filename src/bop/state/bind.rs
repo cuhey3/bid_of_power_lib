@@ -1,4 +1,4 @@
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::bop_shared_state::BoPSharedState;
 use crate::bop::state::message::BidMessage;
 use crate::svg::simple_binder::SimpleBinder;
 use crate::svg::svg_renderer::get_element_by_id;
@@ -12,41 +12,41 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         .unwrap()
         .get_element_by_id("simple-binder-required-input")
         .unwrap();
-    fn required_input_func(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
-        if card_game_shared_state.phase_index == 4 {
-            if card_game_shared_state.players[0].player_state.current_hp > 0 {
+    fn required_input_func(bop_shared_state: &mut BoPSharedState, _: usize) -> String {
+        if bop_shared_state.phase_index == 4 {
+            if bop_shared_state.players[0].player_state.current_hp > 0 {
                 return format!(
                     "{}さんの勝利です",
-                    card_game_shared_state.players[0].player_name
+                    bop_shared_state.players[0].player_name
                 );
             } else {
                 return format!(
                     "{}さんの勝利です",
-                    card_game_shared_state.players[1].player_name
+                    bop_shared_state.players[1].player_name
                 );
             }
         }
-        if card_game_shared_state.input_is_guard {
+        if bop_shared_state.input_is_guard {
             return format!(
                 "{}さんの入力を待っています...",
-                card_game_shared_state.players[(card_game_shared_state.own_player_index + 1)
-                    % card_game_shared_state.players.len()]
+                bop_shared_state.players[(bop_shared_state.own_player_index + 1)
+                    % bop_shared_state.players.len()]
                 .player_name
             );
         }
-        match card_game_shared_state.phase_index {
+        match bop_shared_state.phase_index {
             1 => format!(
                 "{}さん、入札してください。上下: 選択　左右: 金額変更　A: 決定",
-                card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
+                bop_shared_state.players[bop_shared_state.own_player_index].player_name
             ),
             2 => format!(
                 "{}さん、使用するアイテムを選んでください。上下: 選択　A: 決定　Z: スキップ",
-                card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
+                bop_shared_state.players[bop_shared_state.own_player_index].player_name
             ),
 
             3 => format!(
                 "{}さん、攻撃対象を選んでください。",
-                card_game_shared_state.players[card_game_shared_state.own_player_index].player_name
+                bop_shared_state.players[bop_shared_state.own_player_index].player_name
             ),
             _ => "".to_string(),
         }
@@ -54,10 +54,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     binds.push(SimpleBinder::new(required_input, 0, required_input_func));
 
     fn bid_amount_func(
-        card_game_shared_state: &mut CardGameSharedState,
+        bop_shared_state: &mut BoPSharedState,
         args_usize: usize,
     ) -> String {
-        if let Some(bid_input) = card_game_shared_state.bid_input.get(args_usize) {
+        if let Some(bid_input) = bop_shared_state.bid_input.get(args_usize) {
             bid_input.bid_amount.to_string()
         } else {
             "".to_string()
@@ -65,12 +65,12 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
 
     fn current_amount_func(
-        card_game_shared_state: &mut CardGameSharedState,
+        bop_shared_state: &mut BoPSharedState,
         args_usize: usize,
     ) -> String {
         let amount = BidMessage::current_bid_amount(
             args_usize,
-            &card_game_shared_state.temporary_bid_history,
+            &bop_shared_state.temporary_bid_history,
         );
         if amount == 0 {
             "-".to_string()
@@ -92,87 +92,87 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..11 {
-        fn card_list_a(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn item_list_a(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.players[0]
-                .own_card_list
+            if let Some(item) = bop_shared_state.players[0]
+                .own_item_list
                 .get(args_usize)
             {
-                card.card_kind.get_card_name()
+                item.item_kind.get_item_name()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
-            get_element_by_id(format!("simple-binder-card-list-a-{}", n + 1)),
+            get_element_by_id(format!("simple-binder-item-list-a-{}", n + 1)),
             n,
-            card_list_a,
+            item_list_a,
         ));
-        fn card_list_a_description(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn item_list_a_description(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.players[0]
-                .own_card_list
+            if let Some(item) = bop_shared_state.players[0]
+                .own_item_list
                 .get(args_usize)
             {
-                card.card_kind.get_card_description()
+                item.item_kind.get_item_description()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
-            get_element_by_id(format!("simple-binder-card-list-a-{}-description", n + 1)),
+            get_element_by_id(format!("simple-binder-item-list-a-{}-description", n + 1)),
             n,
-            card_list_a_description,
+            item_list_a_description,
         ));
     }
     for n in 0..10 {
-        fn card_list_b(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn bop_list_b(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.players[1]
-                .own_card_list
+            if let Some(item) = bop_shared_state.players[1]
+                .own_item_list
                 .get(args_usize)
             {
-                card.card_kind.get_card_name()
+                item.item_kind.get_item_name()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
-            get_element_by_id(format!("simple-binder-card-list-b-{}", n + 1)),
+            get_element_by_id(format!("simple-binder-item-list-b-{}", n + 1)),
             n,
-            card_list_b,
+            bop_list_b,
         ));
-        fn card_list_b_description(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn item_list_b_description(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.players[1]
-                .own_card_list
+            if let Some(item) = bop_shared_state.players[1]
+                .own_item_list
                 .get(args_usize)
             {
-                card.card_kind.get_card_description()
+                item.item_kind.get_item_description()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
-            get_element_by_id(format!("simple-binder-card-list-b-{}-description", n + 1)),
+            get_element_by_id(format!("simple-binder-item-list-b-{}-description", n + 1)),
             n,
-            card_list_b_description,
+            item_list_b_description,
         ));
     }
     for n in 0..2 {
         fn player_info_money(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            let player_state = &card_game_shared_state.players[args_usize].player_state;
+            let player_state = &bop_shared_state.players[args_usize].player_state;
             format!(
                 "{}(+{})",
                 player_state.current_money_amount, player_state.estimated_money_amount
@@ -188,51 +188,51 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
     for n in 0..19 {
-        fn scheduled_card(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn scheduled_item(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.bid_scheduled_cards.get(args_usize) {
-                card.card_kind.get_card_name()
+            if let Some(item) = bop_shared_state.bid_scheduled_items.get(args_usize) {
+                item.item_kind.get_item_name()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
-            get_element_by_id(format!("simple-binder-scheduled-card-{}", n + 1)),
+            get_element_by_id(format!("simple-binder-scheduled-item-{}", n + 1)),
             n,
-            scheduled_card,
+            scheduled_item,
         ));
     }
     for n in 0..19 {
-        fn scheduled_card_description(
-            card_game_shared_state: &mut CardGameSharedState,
+        fn scheduled_item_description(
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if let Some(card) = card_game_shared_state.bid_scheduled_cards.get(args_usize) {
-                card.card_kind.get_card_description()
+            if let Some(item) = bop_shared_state.bid_scheduled_items.get(args_usize) {
+                item.item_kind.get_item_description()
             } else {
                 "".to_string()
             }
         }
         binds.push(SimpleBinder::new(
             get_element_by_id(format!(
-                "simple-binder-scheduled-card-description-{}",
+                "simple-binder-scheduled-item-description-{}",
                 n + 1
             )),
             n,
-            scheduled_card_description,
+            scheduled_item_description,
         ));
     }
     for n in 0..2 {
         fn player_status(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            let hp = card_game_shared_state.players[args_usize]
+            let hp = bop_shared_state.players[args_usize]
                 .player_state
                 .current_hp;
-            let max_hp = card_game_shared_state.players[args_usize]
+            let max_hp = bop_shared_state.players[args_usize]
                 .player_state
                 .max_hp;
             format!("{}/{}", hp, max_hp)
@@ -248,10 +248,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     for n in 0..2 {
         fn player_status(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            let attack_point = card_game_shared_state.players[args_usize]
+            let attack_point = bop_shared_state.players[args_usize]
                 .player_state
                 .attack_point;
             attack_point.to_string()
@@ -267,10 +267,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     for n in 0..2 {
         fn player_status(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            let defence_point = card_game_shared_state.players[args_usize]
+            let defence_point = bop_shared_state.players[args_usize]
                 .player_state
                 .defence_point;
             defence_point.to_string()
@@ -286,11 +286,11 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     for n in 0..2 {
         fn use_item_cursor(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if card_game_shared_state.phase_index == 2
-                && card_game_shared_state.own_player_index == args_usize
+            if bop_shared_state.phase_index == 2
+                && bop_shared_state.own_player_index == args_usize
             {
                 "👉".to_string()
             } else {
@@ -309,10 +309,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
 
     for n in 0..2 {
         fn initiative(
-            card_game_shared_state: &mut CardGameSharedState,
+            bop_shared_state: &mut BoPSharedState,
             args_usize: usize,
         ) -> String {
-            if card_game_shared_state.initiatives_to_player_index[0] == args_usize {
+            if bop_shared_state.initiatives_to_player_index[0] == args_usize {
                 "先攻"
             } else {
                 "後攻"
@@ -330,10 +330,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
 
     for n in 0..2 {
-        fn damage(card_game_shared_state: &mut CardGameSharedState, args_usize: usize) -> String {
-            let own_player_state = &card_game_shared_state.players[args_usize].player_state;
-            let opponent_player_state = &card_game_shared_state.players
-                [(args_usize + 1) % card_game_shared_state.players.len()]
+        fn damage(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
+            let own_player_state = &bop_shared_state.players[args_usize].player_state;
+            let opponent_player_state = &bop_shared_state.players
+                [(args_usize + 1) % bop_shared_state.players.len()]
             .player_state;
             if opponent_player_state.attack_point == 0 {
                 return 0.to_string();
@@ -352,8 +352,8 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         ));
     }
 
-    fn bid_cursor(card_game_shared_state: &mut CardGameSharedState, _: usize) -> String {
-        if card_game_shared_state.phase_index == 1 {
+    fn bid_cursor(bop_shared_state: &mut BoPSharedState, _: usize) -> String {
+        if bop_shared_state.phase_index == 1 {
             "👉".to_string()
         } else {
             "".to_string()

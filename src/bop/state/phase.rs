@@ -1,4 +1,4 @@
-use crate::bop::state::card_game_shared_state::CardGameSharedState;
+use crate::bop::state::bop_shared_state::BoPSharedState;
 use crate::bop::state::message::{AttackTargetMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::{AttackTarget, Bid, Empty, GameEnd, GameStart, UseCard};
 use wasm_bindgen_test::console_log;
@@ -6,13 +6,13 @@ use wasm_bindgen_test::console_log;
 #[derive(Debug, Clone)]
 pub struct Phase {
     pub phase_type: PhaseType,
-    pub check_phase_complete_func: fn(&mut CardGameSharedState) -> CheckPhaseCompleteResult,
+    pub check_phase_complete_func: fn(&mut BoPSharedState) -> CheckPhaseCompleteResult,
     pub args_usize: Vec<usize>,
 }
 
 impl Phase {
     pub fn empty() -> Phase {
-        fn empty_func(_: &mut CardGameSharedState) -> CheckPhaseCompleteResult {
+        fn empty_func(_: &mut BoPSharedState) -> CheckPhaseCompleteResult {
             CheckPhaseCompleteResult {
                 is_phase_complete: false,
                 next_phase_index: None,
@@ -30,7 +30,7 @@ impl Phase {
         vec![
             Phase::get_game_start_phase(),
             Phase::get_bid_phase(),
-            Phase::get_use_card_phase(),
+            Phase::get_use_item_phase(),
             Phase::get_attack_target_phase(),
         ]
     }
@@ -38,7 +38,7 @@ impl Phase {
         // TODO
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_game_start_phase_complete_func(
-            game_state: &mut CardGameSharedState,
+            game_state: &mut BoPSharedState,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult::empty();
             // 全員受信が難しいので誰か受信でOK
@@ -67,7 +67,7 @@ impl Phase {
         // TODO
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_bid_phase_complete_func(
-            game_state: &mut CardGameSharedState,
+            game_state: &mut BoPSharedState,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult::empty();
             let temporary_history_len = game_state.temporary_bid_history.len();
@@ -84,7 +84,7 @@ impl Phase {
             }
             // 以降は、入札が一巡している
             // 各プレイヤーについて、"最終の"入札済みカードのインデックスを集める
-            let mut player_index_to_target_card_index = vec![0; player_len];
+            let mut player_index_to_target_item_index = vec![0; player_len];
             // 各プレイヤーにについて、最後の入札のインデックスを集める（あとで使う）
             let mut player_index_to_last_bid_index = vec![0; player_len];
             for player_index in 0..player_len {
@@ -100,18 +100,18 @@ impl Phase {
                         .iter()
                         .map(|bid| bid.player_index)
                         .collect::<Vec<usize>>();
-                    console_log!("temporary history len >= player len, but index={} player target card not found. input player index: {:?} {:?}", player_index, input_player_index, game_state.temporary_bid_history);
+                    console_log!("temporary history len >= player len, but index={} player target item not found. input player index: {:?} {:?}", player_index, input_player_index, game_state.temporary_bid_history);
                     panic!()
                 }
-                player_index_to_target_card_index[player_index] = found.unwrap().1.bid_card_index;
+                player_index_to_target_item_index[player_index] = found.unwrap().1.bid_item_index;
                 player_index_to_last_bid_index[player_index] = found.unwrap().0;
             }
             // 各プレイヤーについて、競合を持つかをフラグで集める
             let mut player_index_to_has_competitor_flag = vec![false; player_len];
             for player_a_index in 1..player_len {
                 for player_b_index in 0..player_a_index {
-                    if player_index_to_target_card_index[player_a_index]
-                        == player_index_to_target_card_index[player_b_index]
+                    if player_index_to_target_item_index[player_a_index]
+                        == player_index_to_target_item_index[player_b_index]
                     {
                         // 重複発見時ロジック
                         player_index_to_has_competitor_flag[player_a_index] = true;
@@ -152,15 +152,13 @@ impl Phase {
                 }
 
                 // 引き続き Bid フェーズを行うかの判定
-                let is_continuous_bid = game_state.players[0].own_card_list.len() < 2;
+                let is_continuous_bid = game_state.players[0].own_item_list.len() < 2;
                 // まだカード使用フェーズが来ないなら引き続き Bid、そうでないなら UseCard
                 if is_continuous_bid {
                     result.next_phase_index = Some(Bid as i32 as usize);
                 } else {
                     result.next_phase_index = Some(UseCard as i32 as usize);
                 }
-                // console_log!("debug...list {:?}", game_state.players[0].own_card_list);
-                // console_log!("debug...is_continuous_bid {:?}", is_continuous_bid);
                 return result;
             }
             // 競合が見つかっている場合のロジック
@@ -201,12 +199,12 @@ impl Phase {
         }
     }
 
-    pub fn get_use_card_phase() -> Phase {
+    pub fn get_use_item_phase() -> Phase {
         // TODO
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
 
-        fn check_use_card_complete_func(
-            game_state: &mut CardGameSharedState,
+        fn check_use_item_complete_func(
+            game_state: &mut BoPSharedState,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult::empty();
             if let Some(_) = game_state
@@ -222,14 +220,14 @@ impl Phase {
             let own_player_index = game_state.own_player_index;
 
             // このターンの使用履歴を収集
-            let this_turn_card_history = game_state
-                .use_card_history
+            let this_turn_item_history = game_state
+                .use_item_history
                 .iter()
                 .filter(|history| history.turn == game_state.turn)
                 .collect::<Vec<&UseCardMessage>>();
 
             // このターンの使用履歴が空の場合は不完了
-            if this_turn_card_history.is_empty() {
+            if this_turn_item_history.is_empty() {
                 let next_input_player_index = game_state.initiatives_to_player_index[0];
                 // 優先順位の先頭が自分であれば次の入力者
                 result.is_required_own_input_for_complete =
@@ -237,7 +235,7 @@ impl Phase {
                 return result;
             }
             // 空でない場合は、先にカード連続使用中（他者の使用ブロック中）でないかを確認
-            let last_history = this_turn_card_history.last().unwrap();
+            let last_history = this_turn_item_history.last().unwrap();
             if last_history.check_is_blocked {
                 // そうである場合はそれが自分であれば次の入力者
                 result.is_required_own_input_for_complete =
@@ -245,22 +243,22 @@ impl Phase {
                 return result;
             }
             // 使用フラグを収集
-            let mut player_index_to_card_used_flag = vec![false; player_len];
+            let mut player_index_to_item_used_flag = vec![false; player_len];
 
             for player_index in 0..player_len {
                 // カードを使用していなければ当然履歴も見つからない点に注意
-                if let Some(last_history) = this_turn_card_history
+                if let Some(last_history) = this_turn_item_history
                     .iter()
                     .find(|history| history.player_index == player_index)
                 {
-                    player_index_to_card_used_flag[last_history.player_index] = true;
+                    player_index_to_item_used_flag[last_history.player_index] = true;
                 }
-                if game_state.players[player_index].own_card_list.is_empty() {
-                    player_index_to_card_used_flag[player_index] = true;
+                if game_state.players[player_index].own_item_list.is_empty() {
+                    player_index_to_item_used_flag[player_index] = true;
                 }
             }
             // 全員が使用完了
-            if player_index_to_card_used_flag.iter().all(|flag| *flag) {
+            if player_index_to_item_used_flag.iter().all(|flag| *flag) {
                 result.is_phase_complete = true;
                 result.next_phase_index = Some(AttackTarget as i32 as usize);
                 return result;
@@ -268,7 +266,7 @@ impl Phase {
             // 次のカード使用者を探索
             for player_index in game_state.initiatives_to_player_index.iter() {
                 // カード使用済みの場合は除外
-                if player_index_to_card_used_flag[*player_index] {
+                if player_index_to_item_used_flag[*player_index] {
                     continue;
                 }
                 // 優先順で最初に見つかったカード未使用プレイヤーが次のプレイヤー
@@ -279,7 +277,7 @@ impl Phase {
         }
         Phase {
             phase_type: UseCard,
-            check_phase_complete_func: check_use_card_complete_func,
+            check_phase_complete_func: check_use_item_complete_func,
             args_usize: vec![],
         }
     }
@@ -288,7 +286,7 @@ impl Phase {
         // TODO
         // この関数は、3人以上のプレイヤーを意識して書かれていますが、動作確認は不十分です
         fn check_attack_target_complete_func(
-            game_state: &mut CardGameSharedState,
+            game_state: &mut BoPSharedState,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult::empty();
             let player_len = game_state.players.len();
@@ -350,9 +348,9 @@ impl Phase {
                 // 2以上ないと入札ができない
                 // アイテム数が偶数なら1になることはないのだが、なぜか1になるケースがある
                 // 根本的解決が必要
-                if game_state.cards_bid_on.len() < 2 {
-                    if game_state.players[0].own_card_list.is_empty()
-                        && game_state.players[1].own_card_list.is_empty()
+                if game_state.items_bid_on.len() < 2 {
+                    if game_state.players[0].own_item_list.is_empty()
+                        && game_state.players[1].own_item_list.is_empty()
                     {
                         result.next_phase_index = Some(AttackTarget as i32 as usize);
                     } else {
@@ -383,7 +381,7 @@ impl Phase {
     }
 
     pub fn get_game_end_phase() -> Phase {
-        fn check_game_end_complete_func(_: &mut CardGameSharedState) -> CheckPhaseCompleteResult {
+        fn check_game_end_complete_func(_: &mut BoPSharedState) -> CheckPhaseCompleteResult {
             CheckPhaseCompleteResult {
                 is_phase_complete: true,
                 next_phase_index: None,

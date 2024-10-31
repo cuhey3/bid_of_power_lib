@@ -51,7 +51,7 @@ impl TitleState {
     pub fn create_consume_func(&self) -> fn(&mut Scene, &mut State, Input) {
         fn consume_func(scene: &mut Scene, shared_state: &mut State, input: Input) {
             if let State {
-                state_type: BoPShared(card_game_shared_state),
+                state_type: BoPShared(bop_shared_state),
                 to_send_channel_messages,
                 ..
             } = shared_state
@@ -63,7 +63,7 @@ impl TitleState {
                         }
                         Input::Enter => {
                             if title_state.cursor.chose_index == 0 {
-                                card_game_shared_state.has_cpu = true;
+                                bop_shared_state.has_cpu = true;
                                 shared_state.primitives.requested_scene_index = 1;
                                 to_send_channel_messages.push(
                                     serde_json::to_string(&GameStartIsApprovedMessage {

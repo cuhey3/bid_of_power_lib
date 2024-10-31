@@ -1,4 +1,4 @@
-use crate::bop::mechanism::card::CardKind;
+use crate::bop::mechanism::item::ItemKind;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::state::State;
 use rand::{thread_rng, Rng};
@@ -14,7 +14,7 @@ pub struct GameStartIsApprovedMessage {
 pub struct BidMessage {
     pub seq_no: usize,
     pub player_index: usize,
-    pub bid_card_index: usize,
+    pub bid_item_index: usize,
     pub bid_amount: u32,
 }
 
@@ -23,7 +23,7 @@ impl BidMessage {
         BidMessage {
             seq_no: 0,
             player_index: 0,
-            bid_card_index: index,
+            bid_item_index: index,
             bid_amount: 1,
         }
     }
@@ -40,7 +40,7 @@ impl BidMessage {
         for input_index in 0..bid_input.len() {
             if let Some(past_bid) = temporary_bid_history
                 .iter()
-                .filter(|history| history.bid_card_index == input_index)
+                .filter(|history| history.bid_item_index == input_index)
                 .last()
             {
                 bid_input[input_index].bid_amount = past_bid.bid_amount + 2
@@ -48,12 +48,12 @@ impl BidMessage {
         }
     }
 
-    pub fn current_bid_amount(card_index: usize, temporary_bid_history: &Vec<BidMessage>) -> u32 {
+    pub fn current_bid_amount(item_index: usize, temporary_bid_history: &Vec<BidMessage>) -> u32 {
         if temporary_bid_history.is_empty() {
             0
         } else if let Some(last_bid) = temporary_bid_history
             .iter()
-            .filter(|history| history.bid_card_index == card_index)
+            .filter(|history| history.bid_item_index == item_index)
             .last()
         {
             last_bid.bid_amount
@@ -71,7 +71,7 @@ pub struct UseCardMessage {
     // 当然ブロックしているユーザーが次のカード使用者である
     pub check_is_blocked: bool,
     pub player_index: usize,
-    pub use_card_index: usize,
+    pub use_item_index: usize,
     pub is_skipped: bool,
     pub args_i32: Vec<i32>,
     pub args_usize: Vec<usize>,
@@ -84,7 +84,7 @@ impl UseCardMessage {
             turn,
             check_is_blocked: false,
             player_index: 0,
-            use_card_index: 0,
+            use_item_index: 0,
             is_skipped: false,
             args_i32: vec![],
             args_usize: vec![],
@@ -135,18 +135,18 @@ pub struct GameRuleMessage {
     pub host_player_index: usize,
     pub guest_player_name: String,
     pub guest_player_index: usize,
-    pub card_kind_list: Vec<CardKind>,
+    pub item_kind_list: Vec<ItemKind>,
 }
 
 impl GameRuleMessage {
     pub fn from_state(state: &mut State, guest_player_name: String) -> GameRuleMessage {
         let mut rng = thread_rng();
-        if let BoPShared(card_game_shared_state) = &state.state_type {
-            let card_kind_list = card_game_shared_state
-                .bid_scheduled_cards
+        if let BoPShared(bop_shared_state) = &state.state_type {
+            let item_kind_list = bop_shared_state
+                .bid_scheduled_items
                 .iter()
-                .map(|card| card.card_kind.clone())
-                .collect::<Vec<CardKind>>();
+                .map(|item| item.item_kind.clone())
+                .collect::<Vec<ItemKind>>();
 
             let host_is_first = rng.gen_bool(0.5);
             GameRuleMessage {
@@ -154,7 +154,7 @@ impl GameRuleMessage {
                 host_player_index: if host_is_first { 0 } else { 1 },
                 guest_player_name,
                 guest_player_index: if host_is_first { 1 } else { 0 },
-                card_kind_list,
+                item_kind_list,
             }
         } else {
             panic!()

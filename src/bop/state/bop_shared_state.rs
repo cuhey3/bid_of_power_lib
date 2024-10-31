@@ -1,4 +1,4 @@
-use crate::bop::mechanism::card::{Card, CardKind};
+use crate::bop::mechanism::item::{Item, ItemKind};
 use crate::bop::mechanism::player_state::PlayerState;
 use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::*;
@@ -7,11 +7,11 @@ use crate::svg::simple_binder::SimpleBinder;
 use wasm_bindgen_test::console_log;
 
 #[derive(Clone, Debug)]
-pub struct CardGamePlayer {
+pub struct BoPPlayer {
     pub player_name: String,
     pub game_start_is_approved: bool,
     pub battle_is_viewed: bool,
-    pub own_card_list: Vec<Card>,
+    pub own_item_list: Vec<Item>,
     pub player_state: PlayerState,
 }
 
@@ -32,18 +32,18 @@ pub enum LogType {
 }
 
 #[derive(Clone)]
-pub struct CardGameSharedState {
-    pub players: Vec<CardGamePlayer>,
+pub struct BoPSharedState {
+    pub players: Vec<BoPPlayer>,
     pub own_player_index: usize,
-    pub cards_bid_on: Vec<Card>,
+    pub items_bid_on: Vec<Item>,
     // 入札確定前の入力を管理する
     pub bid_input: Vec<BidMessage>,
-    pub bid_scheduled_cards: Vec<Card>,
+    pub bid_scheduled_items: Vec<Item>,
     pub temporary_bid_history: Vec<BidMessage>,
     pub bid_history: Vec<BidMessage>,
     // カード使用確定前の入力を管理する
-    pub use_card_input: UseCardMessage,
-    pub use_card_history: Vec<UseCardMessage>,
+    pub use_item_input: UseCardMessage,
+    pub use_item_history: Vec<UseCardMessage>,
     pub attack_target_input: AttackTargetMessage,
     pub attack_target_history: Vec<AttackTargetMessage>,
     // このVectorだけ少し特殊で、プレイヤーのインデックス自体が追加される
@@ -62,7 +62,7 @@ pub struct CardGameSharedState {
     pub has_cpu: bool,
 }
 
-impl CardGameSharedState {
+impl BoPSharedState {
     pub fn get_seq_no_to_send(&self) -> usize {
         self.consumed_seq_no + 1
     }
@@ -128,22 +128,22 @@ impl CardGameSharedState {
         match self.phases[next_phase_index].phase_type {
             Bid => match now_phase_index {
                 0 => {
-                    while self.cards_bid_on.len() < 3 && self.bid_scheduled_cards.len() > 0 {
-                        let card = self.bid_scheduled_cards.remove(0);
-                        self.cards_bid_on.push(card);
+                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
+                        let item = self.bid_scheduled_items.remove(0);
+                        self.items_bid_on.push(item);
                     }
                 }
                 1 => {
                     // 入札中リストの後ろから対象の履歴を探す
-                    // 途中で cards_bid_on に対して remove するのでインデックスがズレないように
-                    let bid_on_len = self.cards_bid_on.len();
+                    // 途中で items_bid_on に対して remove するのでインデックスがズレないように
+                    let bid_on_len = self.items_bid_on.len();
                     for bid_on_index_reverse in 0..bid_on_len {
                         if let Some((history_index, history)) = self
                             .temporary_bid_history
                             .iter_mut()
                             .enumerate()
                             .filter(|(_, history)| {
-                                bid_on_len - bid_on_index_reverse - 1 == history.bid_card_index
+                                bid_on_len - bid_on_index_reverse - 1 == history.bid_item_index
                             })
                             .last()
                         {
@@ -157,18 +157,17 @@ impl CardGameSharedState {
                                         .estimated_money_amount;
                             self.bid_history.push(history);
                             let item = self
-                                .cards_bid_on
+                                .items_bid_on
                                 .remove(bid_on_len - bid_on_index_reverse - 1);
-                            self.players[player_index].own_card_list.push(item);
+                            self.players[player_index].own_item_list.push(item);
                         } else {
-                            // cards_bid_on の中には落札されていないアイテムも当然存在する
+                            // items_bid_on の中には落札されていないアイテムも当然存在する
                         };
                     }
                     self.temporary_bid_history.clear();
-                    while self.cards_bid_on.len() < 3 && self.bid_scheduled_cards.len() > 0 {
-                        let card = self.bid_scheduled_cards.remove(0);
-                        self.cards_bid_on.push(card);
-                        // console_log!("bid on update {} {} {}", self.cards_bid_on.len(), self.bid_scheduled_cards.len(), self.turn)
+                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
+                        let item = self.bid_scheduled_items.remove(0);
+                        self.items_bid_on.push(item);
                     }
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
                     self.turn += 1;
@@ -184,15 +183,15 @@ impl CardGameSharedState {
             UseCard => match now_phase_index {
                 1 => {
                     // 入札中リストの後ろから対象の履歴を探す
-                    // 途中で cards_bid_on に対して remove するのでインデックスがズレないように
-                    let bid_on_len = self.cards_bid_on.len();
+                    // 途中で items_bid_on に対して remove するのでインデックスがズレないように
+                    let bid_on_len = self.items_bid_on.len();
                     for bid_on_index_reverse in 0..bid_on_len {
                         if let Some((history_index, history)) = self
                             .temporary_bid_history
                             .iter_mut()
                             .enumerate()
                             .filter(|(_, history)| {
-                                bid_on_len - bid_on_index_reverse - 1 == history.bid_card_index
+                                bid_on_len - bid_on_index_reverse - 1 == history.bid_item_index
                             })
                             .last()
                         {
@@ -206,18 +205,17 @@ impl CardGameSharedState {
                                         .estimated_money_amount;
                             self.bid_history.push(history);
                             let item = self
-                                .cards_bid_on
+                                .items_bid_on
                                 .remove(bid_on_len - bid_on_index_reverse - 1);
-                            self.players[player_index].own_card_list.push(item);
+                            self.players[player_index].own_item_list.push(item);
                         } else {
-                            // cards_bid_on の中には落札されていないアイテムも当然存在する
+                            // items_bid_on の中には落札されていないアイテムも当然存在する
                         };
                     }
                     self.temporary_bid_history.clear();
-                    while self.cards_bid_on.len() < 3 && self.bid_scheduled_cards.len() > 0 {
-                        let card = self.bid_scheduled_cards.remove(0);
-                        self.cards_bid_on.push(card);
-                        // console_log!("bid on update {} {} {}", self.cards_bid_on.len(), self.bid_scheduled_cards.len(), self.turn)
+                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
+                        let item = self.bid_scheduled_items.remove(0);
+                        self.items_bid_on.push(item);
                     }
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
                 }
@@ -237,11 +235,11 @@ impl CardGameSharedState {
         self.phase_index = self.phases[next_phase_index].phase_type.to_owned() as i32 as usize;
     }
 
-    pub fn update_card_list(&mut self, card_kind_list: Vec<CardKind>) {
-        let new_cards = card_kind_list
+    pub fn update_item_list(&mut self, item_kind_list: Vec<ItemKind>) {
+        let new_items = item_kind_list
             .into_iter()
-            .map(|card_kind| Card::from(card_kind))
-            .collect::<Vec<Card>>();
-        self.bid_scheduled_cards = new_cards;
+            .map(|item_kind| Item::from(item_kind))
+            .collect::<Vec<Item>>();
+        self.bid_scheduled_items = new_items;
     }
 }
