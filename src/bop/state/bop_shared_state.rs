@@ -1,6 +1,6 @@
 use crate::bop::mechanism::item::{Item, ItemKind};
 use crate::bop::mechanism::player_status::PlayerStatus;
-use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
+use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseItemMessage};
 use crate::bop::state::phase::PhaseType::*;
 use crate::bop::state::phase::{CheckPhaseCompleteResult, Phase};
 use crate::features::animation::Animation;
@@ -33,7 +33,7 @@ pub enum LogType {
     Joined(usize),
     BidSuccessful(usize),
     InitiativeChanged(usize),
-    UseCard(usize),
+    UseItem(usize),
     AttackTarget(usize, u32),
     GameEnd(usize),
 }
@@ -50,8 +50,8 @@ pub struct BoPSharedState {
     pub temporary_bid_history: Vec<BidMessage>,
     pub bid_history: Vec<BidMessage>,
     // カード使用確定前の入力を管理する
-    pub use_item_input: UseCardMessage,
-    pub use_item_history: Vec<UseCardMessage>,
+    pub use_item_input: UseItemMessage,
+    pub use_item_history: Vec<UseItemMessage>,
     pub attack_target_input: AttackTargetMessage,
     pub attack_target_history: Vec<AttackTargetMessage>,
     // このVectorだけ少し特殊で、プレイヤーのインデックス自体が追加される
@@ -136,50 +136,11 @@ impl BoPSharedState {
         match self.phases[next_phase_index].phase_type {
             Bid => match now_phase_index {
                 0 => {
-                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
-                        let item = self.bid_scheduled_items.remove(0);
-                        self.items_bid_on.push(item);
-                    }
+                    self.ready_to_bid();
                 }
                 1 => {
-                    // 入札中リストの後ろから対象の履歴を探す
-                    // 途中で items_bid_on に対して remove するのでインデックスがズレないように
-                    let bid_on_len = self.items_bid_on.len();
-                    for bid_on_index_reverse in 0..bid_on_len {
-                        if let Some((history_index, history)) = self
-                            .temporary_bid_history
-                            .iter_mut()
-                            .enumerate()
-                            .filter(|(_, history)| {
-                                bid_on_len - bid_on_index_reverse - 1 == history.bid_item_index
-                            })
-                            .last()
-                        {
-                            let player_index = history.player_index;
-                            let history = self.temporary_bid_history.remove(history_index);
-                            self.players[player_index]
-                                .player_status
-                                .current_money_amount = self.players[player_index]
-                                .player_status
-                                .current_money_amount
-                                - history.bid_amount
-                                + self.players[player_index]
-                                    .player_status
-                                    .estimated_money_amount;
-                            self.bid_history.push(history);
-                            let item = self
-                                .items_bid_on
-                                .remove(bid_on_len - bid_on_index_reverse - 1);
-                            self.players[player_index].own_item_list.push(item);
-                        } else {
-                            // items_bid_on の中には落札されていないアイテムも当然存在する
-                        };
-                    }
-                    self.temporary_bid_history.clear();
-                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
-                        let item = self.bid_scheduled_items.remove(0);
-                        self.items_bid_on.push(item);
-                    }
+                    self.move_to_own_item_list();
+                    self.ready_to_bid();
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
                     self.turn += 1;
                 }
@@ -191,46 +152,10 @@ impl BoPSharedState {
                 }
                 _ => {}
             },
-            UseCard => match now_phase_index {
+            UseItem => match now_phase_index {
                 1 => {
-                    // 入札中リストの後ろから対象の履歴を探す
-                    // 途中で items_bid_on に対して remove するのでインデックスがズレないように
-                    let bid_on_len = self.items_bid_on.len();
-                    for bid_on_index_reverse in 0..bid_on_len {
-                        if let Some((history_index, history)) = self
-                            .temporary_bid_history
-                            .iter_mut()
-                            .enumerate()
-                            .filter(|(_, history)| {
-                                bid_on_len - bid_on_index_reverse - 1 == history.bid_item_index
-                            })
-                            .last()
-                        {
-                            let player_index = history.player_index;
-                            let history = self.temporary_bid_history.remove(history_index);
-                            self.players[player_index]
-                                .player_status
-                                .current_money_amount = self.players[player_index]
-                                .player_status
-                                .current_money_amount
-                                - history.bid_amount
-                                + self.players[player_index]
-                                    .player_status
-                                    .estimated_money_amount;
-                            self.bid_history.push(history);
-                            let item = self
-                                .items_bid_on
-                                .remove(bid_on_len - bid_on_index_reverse - 1);
-                            self.players[player_index].own_item_list.push(item);
-                        } else {
-                            // items_bid_on の中には落札されていないアイテムも当然存在する
-                        };
-                    }
-                    self.temporary_bid_history.clear();
-                    while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
-                        let item = self.bid_scheduled_items.remove(0);
-                        self.items_bid_on.push(item);
-                    }
+                    self.move_to_own_item_list();
+                    self.ready_to_bid();
                     BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
                 }
                 3 => {
@@ -272,7 +197,7 @@ impl BoPSharedState {
             }
             self.temporary_bid_history.push(message);
             BidMessage::ready_bid_input(&mut self.bid_input, &self.temporary_bid_history);
-        } else if let Ok(message) = serde_json::from_str::<UseCardMessage>(&message) {
+        } else if let Ok(message) = serde_json::from_str::<UseItemMessage>(&message) {
             if !self.check_and_update_seq_no(
                 message.seq_no,
                 message.player_index == self.own_player_index,
@@ -342,5 +267,49 @@ impl BoPSharedState {
 
     pub fn opponent_player_index(&self, player_index: usize) -> usize {
         (player_index + 1) % self.players_len
+    }
+
+    pub fn ready_to_bid(&mut self) {
+        while self.items_bid_on.len() < 3 && self.bid_scheduled_items.len() > 0 {
+            let item = self.bid_scheduled_items.remove(0);
+            self.items_bid_on.push(item);
+        }
+    }
+
+    pub fn move_to_own_item_list(&mut self) {
+        // 入札中リストの後ろから対象の履歴を探す
+        // 途中で items_bid_on に対して remove するのでインデックスがズレないように
+        let bid_on_len = self.items_bid_on.len();
+        for bid_on_index_reverse in 0..bid_on_len {
+            if let Some((history_index, history)) = self
+                .temporary_bid_history
+                .iter_mut()
+                .enumerate()
+                .filter(|(_, history)| {
+                    bid_on_len - bid_on_index_reverse - 1 == history.bid_item_index
+                })
+                .last()
+            {
+                let player_index = history.player_index;
+                let history = self.temporary_bid_history.remove(history_index);
+                self.players[player_index]
+                    .player_status
+                    .current_money_amount = self.players[player_index]
+                    .player_status
+                    .current_money_amount
+                    - history.bid_amount
+                    + self.players[player_index]
+                    .player_status
+                    .estimated_money_amount;
+                self.bid_history.push(history);
+                let item = self
+                    .items_bid_on
+                    .remove(bid_on_len - bid_on_index_reverse - 1);
+                self.players[player_index].own_item_list.push(item);
+            } else {
+                // items_bid_on の中には落札されていないアイテムも当然存在する
+            };
+        }
+        self.temporary_bid_history.clear();
     }
 }

@@ -1,6 +1,6 @@
 use crate::bop::state::bop_shared_state::BoPSharedState;
-use crate::bop::state::message::{AttackTargetMessage, UseCardMessage};
-use crate::bop::state::phase::PhaseType::{AttackTarget, Bid, Empty, GameEnd, GameStart, UseCard};
+use crate::bop::state::message::{AttackTargetMessage, UseItemMessage};
+use crate::bop::state::phase::PhaseType::{AttackTarget, Bid, Empty, GameEnd, GameStart, UseItem};
 use wasm_bindgen_test::console_log;
 
 #[derive(Debug, Clone)]
@@ -153,11 +153,11 @@ impl Phase {
 
                 // 引き続き Bid フェーズを行うかの判定
                 let is_continuous_bid = game_state.players[0].own_item_list.len() < 2;
-                // まだカード使用フェーズが来ないなら引き続き Bid、そうでないなら UseCard
+                // まだカード使用フェーズが来ないなら引き続き Bid、そうでないなら UseItem
                 if is_continuous_bid {
                     result.next_phase_index = Some(Bid as i32 as usize);
                 } else {
-                    result.next_phase_index = Some(UseCard as i32 as usize);
+                    result.next_phase_index = Some(UseItem as i32 as usize);
                 }
                 return result;
             }
@@ -220,7 +220,7 @@ impl Phase {
                 .use_item_history
                 .iter()
                 .filter(|history| history.turn == game_state.turn)
-                .collect::<Vec<&UseCardMessage>>();
+                .collect::<Vec<&UseItemMessage>>();
 
             // このターンの使用履歴が空の場合は不完了
             if this_turn_item_history.is_empty() {
@@ -272,7 +272,7 @@ impl Phase {
             result
         }
         Phase {
-            phase_type: UseCard,
+            phase_type: UseItem,
             check_phase_complete_func: check_use_item_complete_func,
             args_usize: vec![],
         }
@@ -346,7 +346,7 @@ impl Phase {
                     {
                         result.next_phase_index = Some(AttackTarget as i32 as usize);
                     } else {
-                        result.next_phase_index = Some(UseCard as i32 as usize);
+                        result.next_phase_index = Some(UseItem as i32 as usize);
                     }
                 } else {
                     result.next_phase_index = Some(Bid as i32 as usize);
@@ -409,7 +409,7 @@ impl CheckPhaseCompleteResult {
 pub enum PhaseType {
     GameStart,
     Bid,
-    UseCard,
+    UseItem,
     AttackTarget,
     GameEnd,
     Empty,

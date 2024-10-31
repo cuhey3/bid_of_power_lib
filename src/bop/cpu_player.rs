@@ -1,5 +1,5 @@
 use crate::bop::state::bop_shared_state::BoPSharedState;
-use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
+use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseItemMessage};
 use rand::{thread_rng, Rng};
 use wasm_bindgen_test::console_log;
 
@@ -25,7 +25,7 @@ impl CPUPlayer {
                 let item_len = self.bop_shared_state.players[player_index]
                     .own_item_list
                     .len();
-                serde_json::to_string(&UseCardMessage {
+                serde_json::to_string(&UseItemMessage {
                     seq_no,
                     turn,
                     check_is_blocked: false,
@@ -307,7 +307,7 @@ impl CPUPlayer {
                         input_players.push(simulating_player == player_index);
                     }
                     bop_shared_state.update_game_state_by_message(
-                        serde_json::to_string(&UseCardMessage {
+                        serde_json::to_string(&UseItemMessage {
                             seq_no: bop_shared_state.consumed_seq_no + 1,
                             turn,
                             check_is_blocked: false,

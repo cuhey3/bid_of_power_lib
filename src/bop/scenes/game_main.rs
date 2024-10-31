@@ -1,6 +1,6 @@
 use crate::bop::cpu_player::CPUPlayer;
 use crate::bop::state::message::{
-    AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, UseCardMessage,
+    AttackTargetMessage, BidMessage, GameStartIsApprovedMessage, UseItemMessage,
 };
 use crate::engine::application_types::SceneType::BoPGameMain;
 use crate::engine::application_types::StateType::BoPShared;
@@ -225,7 +225,7 @@ impl GameMainState {
                                             .chose_index;
                                         game_main_state.use_item_cursors[player_index].reset();
                                         to_send_channel_messages.push(
-                                            serde_json::to_string(&UseCardMessage {
+                                            serde_json::to_string(&UseItemMessage {
                                                 seq_no: bop_shared_state.get_seq_no_to_send(),
                                                 turn: bop_shared_state.turn,
                                                 check_is_blocked: false,
@@ -244,7 +244,7 @@ impl GameMainState {
                                 } else if game_main_state.is_item_use_skip_confirm_opened {
                                     if game_main_state.renderers[1].cursor.chose_index == 0 {
                                         to_send_channel_messages.push(
-                                            serde_json::to_string(&UseCardMessage {
+                                            serde_json::to_string(&UseItemMessage {
                                                 seq_no: bop_shared_state.get_seq_no_to_send(),
                                                 turn: bop_shared_state.turn,
                                                 check_is_blocked: false,

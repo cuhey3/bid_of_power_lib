@@ -2,7 +2,6 @@ use crate::bop::scenes::game_main::GameMainState;
 use crate::bop::state::bind::get_binds;
 use crate::bop::state::bop_shared_state::BoPPlayer;
 use crate::bop::state::message::{GameStartIsApprovedMessage, GameStateMessage};
-use crate::engine::application_types::StateType;
 use crate::engine::application_types::StateType::BoPShared;
 use crate::engine::state::{Primitives, References, State};
 use crate::engine::Engine;
@@ -14,7 +13,7 @@ use mechanism::player_status::PlayerStatus;
 use rand::Rng;
 use scenes::title::TitleState;
 use state::bop_shared_state::BoPSharedState;
-use state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
+use state::message::{AttackTargetMessage, BidMessage, UseItemMessage};
 use state::phase::Phase;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -58,7 +57,7 @@ pub fn mount() -> Engine {
         bid_scheduled_items: Item::item_set_default(),
         temporary_bid_history: vec![],
         bid_history: vec![],
-        use_item_input: UseCardMessage::empty(),
+        use_item_input: UseItemMessage::empty(),
         use_item_history: vec![],
         attack_target_input: AttackTargetMessage::empty(),
         attack_target_history: vec![],
@@ -77,7 +76,7 @@ pub fn mount() -> Engine {
         to_send_channel_messages: vec![],
         elements: SharedElements::new(),
         interrupt_animations: vec![vec![Animation::always_blink()]],
-        state_type: StateType::BoPShared(rpg_shared_state.clone()),
+        state_type: BoPShared(rpg_shared_state.clone()),
         primitives: Primitives {
             scene_index: 0,
             requested_scene_index: 0,

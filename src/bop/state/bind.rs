@@ -14,10 +14,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         .unwrap();
     fn required_input_func(bop_shared_state: &mut BoPSharedState, _: usize) -> String {
         if bop_shared_state.phase_index == 4 {
-            if bop_shared_state.players[0].is_lose() {
-                return format!("{}さんの勝利です", bop_shared_state.players[1].player_name);
+            return if bop_shared_state.players[0].is_lose() {
+                format!("{}さんの勝利です", bop_shared_state.players[1].player_name)
             } else {
-                return format!("{}さんの勝利です", bop_shared_state.players[0].player_name);
+                format!("{}さんの勝利です", bop_shared_state.players[0].player_name)
             }
         }
         if bop_shared_state.input_is_guard {

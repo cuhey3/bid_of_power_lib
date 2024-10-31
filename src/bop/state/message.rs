@@ -64,7 +64,7 @@ impl BidMessage {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct UseCardMessage {
+pub struct UseItemMessage {
     pub seq_no: usize,
     pub turn: usize,
     // 1度のターンで複数のカードを使うことができるように用意したフラグ
@@ -77,9 +77,9 @@ pub struct UseCardMessage {
     pub args_usize: Vec<usize>,
 }
 
-impl UseCardMessage {
-    pub fn new_with_turn(turn: usize) -> UseCardMessage {
-        UseCardMessage {
+impl UseItemMessage {
+    pub fn new_with_turn(turn: usize) -> UseItemMessage {
+        UseItemMessage {
             seq_no: 0,
             turn,
             check_is_blocked: false,
@@ -90,8 +90,8 @@ impl UseCardMessage {
             args_usize: vec![],
         }
     }
-    pub fn empty() -> UseCardMessage {
-        UseCardMessage::new_with_turn(0)
+    pub fn empty() -> UseItemMessage {
+        UseItemMessage::new_with_turn(0)
     }
 }
 
