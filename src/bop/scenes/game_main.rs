@@ -112,7 +112,7 @@ impl GameMainState {
                                     bop_shared_state.bid_input[cursor_index].bid_amount;
                                 let player_money = bop_shared_state.players
                                     [bop_shared_state.own_player_index]
-                                    .player_state
+                                    .player_status
                                     .current_money_amount;
                                 bop_shared_state.bid_input[cursor_index].bid_amount =
                                     // プレイヤーの持ち金より最低入札価格が高い場合はそちらを参照しなければならない
@@ -170,11 +170,11 @@ impl GameMainState {
                                 } else {
                                     let item_name = bop_shared_state.items_bid_on[cursor_index]
                                         .item_kind
-                                        .get_item_name();
+                                        .get_name();
                                     let amount =
                                         bop_shared_state.bid_input[cursor_index].bid_amount;
                                     if bop_shared_state.players[bop_shared_state.own_player_index]
-                                        .player_state
+                                        .player_status
                                         .current_money_amount
                                         < amount
                                     {
@@ -269,11 +269,8 @@ impl GameMainState {
                                     game_main_state.renderers[1].render(
                                         vec!["はい".to_string(), "いいえ".to_string()],
                                         vec![],
-                                        format!(
-                                            "{} を使用しますか？",
-                                            item.item_kind.get_item_name()
-                                        )
-                                        .as_str(),
+                                        format!("{} を使用しますか？", item.item_kind.get_name())
+                                            .as_str(),
                                     );
                                     game_main_state.is_item_use_confirm_opened = true;
                                 }
@@ -305,7 +302,7 @@ impl GameMainState {
                             Input::Enter => {
                                 let player_index = bop_shared_state.own_player_index;
                                 let opponent_player_index =
-                                    (player_index + 1) % bop_shared_state.players.len();
+                                    bop_shared_state.opponent_player_index(player_index);
                                 let is_skipped =
                                     game_main_state.renderers[2].cursor.chose_index == 1;
                                 let attack_target_message = AttackTargetMessage {
@@ -370,7 +367,7 @@ impl GameMainState {
                         cpu_player.bop_shared_state.has_cpu = false;
                         let player_index = bop_shared_state.own_player_index;
                         let opponent_player_index =
-                            (player_index + 1) % bop_shared_state.players.len();
+                            bop_shared_state.opponent_player_index(player_index);
                         let index =
                             cpu_player.simulate_multiple_times(opponent_player_index, 40000);
                         console_log!("cpu index is... {}", index);
@@ -381,20 +378,19 @@ impl GameMainState {
                     let item_names = bop_shared_state
                         .items_bid_on
                         .iter()
-                        .map(|item| item.item_kind.get_item_name())
+                        .map(|item| item.item_kind.get_name())
                         .collect();
                     let item_descriptions = bop_shared_state
                         .items_bid_on
                         .iter()
-                        .map(|item| item.item_kind.get_item_description())
+                        .map(|item| item.item_kind.get_description())
                         .collect();
                     game_main_state.renderers[0].render(item_names, item_descriptions, "");
                     match bop_shared_state.phase_index {
                         3 => {
-                            let opponent_player_name =
-                                &bop_shared_state.players[(bop_shared_state.own_player_index + 1)
-                                    % bop_shared_state.players.len()]
-                                .player_name;
+                            let opponent_player_name = &bop_shared_state.players[bop_shared_state
+                                .opponent_player_index(bop_shared_state.own_player_index)]
+                            .player_name;
                             if !bop_shared_state.input_is_guard {
                                 game_main_state.renderers[2].render(
                                     vec![

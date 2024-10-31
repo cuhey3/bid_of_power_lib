@@ -1,5 +1,5 @@
 use crate::bop::mechanism::item::{Item, ItemKind};
-use crate::bop::mechanism::player_state::PlayerState;
+use crate::bop::mechanism::player_status::PlayerStatus;
 use crate::bop::state::message::{AttackTargetMessage, BidMessage, UseCardMessage};
 use crate::bop::state::phase::PhaseType::*;
 use crate::bop::state::phase::{CheckPhaseCompleteResult, Phase};
@@ -13,7 +13,13 @@ pub struct BoPPlayer {
     pub game_start_is_approved: bool,
     pub battle_is_viewed: bool,
     pub own_item_list: Vec<Item>,
-    pub player_state: PlayerState,
+    pub player_status: PlayerStatus,
+}
+
+impl BoPPlayer {
+    pub fn is_lose(&self) -> bool {
+        self.player_status.is_dead()
+    }
 }
 
 #[derive(Clone)]
@@ -35,6 +41,7 @@ pub enum LogType {
 #[derive(Clone)]
 pub struct BoPSharedState {
     pub players: Vec<BoPPlayer>,
+    pub players_len: usize,
     pub own_player_index: usize,
     pub items_bid_on: Vec<Item>,
     // 入札確定前の入力を管理する
@@ -150,12 +157,15 @@ impl BoPSharedState {
                         {
                             let player_index = history.player_index;
                             let history = self.temporary_bid_history.remove(history_index);
-                            self.players[player_index].player_state.current_money_amount =
-                                self.players[player_index].player_state.current_money_amount
-                                    - history.bid_amount
-                                    + self.players[player_index]
-                                        .player_state
-                                        .estimated_money_amount;
+                            self.players[player_index]
+                                .player_status
+                                .current_money_amount = self.players[player_index]
+                                .player_status
+                                .current_money_amount
+                                - history.bid_amount
+                                + self.players[player_index]
+                                    .player_status
+                                    .estimated_money_amount;
                             self.bid_history.push(history);
                             let item = self
                                 .items_bid_on
@@ -198,12 +208,15 @@ impl BoPSharedState {
                         {
                             let player_index = history.player_index;
                             let history = self.temporary_bid_history.remove(history_index);
-                            self.players[player_index].player_state.current_money_amount =
-                                self.players[player_index].player_state.current_money_amount
-                                    - history.bid_amount
-                                    + self.players[player_index]
-                                        .player_state
-                                        .estimated_money_amount;
+                            self.players[player_index]
+                                .player_status
+                                .current_money_amount = self.players[player_index]
+                                .player_status
+                                .current_money_amount
+                                - history.bid_amount
+                                + self.players[player_index]
+                                    .player_status
+                                    .estimated_money_amount;
                             self.bid_history.push(history);
                             let item = self
                                 .items_bid_on
@@ -283,7 +296,7 @@ impl BoPSharedState {
             }
             if message.is_skipped {
                 self.players[message.player_index]
-                    .player_state
+                    .player_status
                     .current_money_amount += 1;
                 if !is_headless {
                     interrupt_animations.push(vec![Animation::create_message(
@@ -295,31 +308,23 @@ impl BoPSharedState {
                     )]);
                 }
             } else {
-                let opponent_player_index = (message.player_index + 1) % self.players.iter().len();
-                let opponent_player_defence_point = self.players[opponent_player_index]
-                    .player_state
-                    .defence_point;
-                let player_attack_point =
-                    self.players[message.player_index].player_state.attack_point;
-                let damage = if player_attack_point == 0 {
-                    0
-                } else if opponent_player_defence_point >= player_attack_point {
-                    1
-                } else {
-                    player_attack_point - opponent_player_defence_point
-                };
-                if damage >= self.players[opponent_player_index].player_state.current_hp {
-                    self.players[opponent_player_index].player_state.current_hp = 0;
-                } else {
-                    self.players[opponent_player_index].player_state.current_hp -= damage;
-                }
+                let opponent_player_index = self.opponent_player_index(message.player_index);
+                let player_attack_point = self.players[message.player_index]
+                    .player_status
+                    .attack_point;
+                let damage = self.players[opponent_player_index]
+                    .player_status
+                    .get_damage(player_attack_point);
+                self.players[opponent_player_index]
+                    .player_status
+                    .update_current_hp(damage as i32 * -1);
                 if !is_headless {
                     interrupt_animations.push(vec![Animation::create_message(
                         format!(
                             "{}さんに{}のダメージ（残りHP: {}）",
                             self.players[opponent_player_index].player_name,
                             damage,
-                            self.players[opponent_player_index].player_state.current_hp,
+                            self.players[opponent_player_index].player_status.current_hp,
                         ),
                         true,
                     )]);
@@ -327,5 +332,15 @@ impl BoPSharedState {
             }
             self.attack_target_history.push(message);
         }
+    }
+    pub fn game_is_end(&self) -> bool {
+        self.players
+            .iter()
+            .find(|player| player.is_lose())
+            .is_some()
+    }
+
+    pub fn opponent_player_index(&self, player_index: usize) -> usize {
+        (player_index + 1) % self.players_len
     }
 }

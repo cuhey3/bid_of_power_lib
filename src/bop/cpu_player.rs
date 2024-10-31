@@ -10,7 +10,7 @@ pub struct CPUPlayer {
 impl CPUPlayer {
     pub fn create_cpu_message(&mut self, index: usize) -> String {
         let player_index = self.bop_shared_state.own_player_index;
-        let opponent_player_index = (player_index + 1) % self.bop_shared_state.players.len();
+        let opponent_player_index = self.bop_shared_state.opponent_player_index(player_index);
         let turn = self.bop_shared_state.turn;
         let seq_no = self.bop_shared_state.consumed_seq_no + 1;
         match self.bop_shared_state.phase_index {
@@ -259,7 +259,7 @@ impl CPUPlayer {
                 }
             }
             let player_index = bop_shared_state.own_player_index;
-            let opponent_player_index = (player_index + 1) % bop_shared_state.players.len();
+            let opponent_player_index = bop_shared_state.opponent_player_index(player_index);
             let turn = bop_shared_state.turn;
             match bop_shared_state.phase_index {
                 1 => {
@@ -269,7 +269,7 @@ impl CPUPlayer {
                         .filter(|input| {
                             input.bid_amount
                                 <= bop_shared_state.players[player_index]
-                                    .player_state
+                                    .player_status
                                     .current_money_amount
                         })
                         .collect::<Vec<&BidMessage>>();
@@ -348,10 +348,7 @@ impl CPUPlayer {
         (
             random_inputs,
             input_players,
-            bop_shared_state.players[simulating_player]
-                .player_state
-                .current_hp
-                != 0,
+            !bop_shared_state.players[simulating_player].is_lose(),
             bop_shared_state.consumed_seq_no,
         )
     }

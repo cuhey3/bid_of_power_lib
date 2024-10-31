@@ -14,17 +14,17 @@ pub fn get_binds() -> Vec<SimpleBinder> {
         .unwrap();
     fn required_input_func(bop_shared_state: &mut BoPSharedState, _: usize) -> String {
         if bop_shared_state.phase_index == 4 {
-            if bop_shared_state.players[0].player_state.current_hp > 0 {
-                return format!("{}さんの勝利です", bop_shared_state.players[0].player_name);
-            } else {
+            if bop_shared_state.players[0].is_lose() {
                 return format!("{}さんの勝利です", bop_shared_state.players[1].player_name);
+            } else {
+                return format!("{}さんの勝利です", bop_shared_state.players[0].player_name);
             }
         }
         if bop_shared_state.input_is_guard {
             return format!(
                 "{}さんの入力を待っています...",
                 bop_shared_state.players
-                    [(bop_shared_state.own_player_index + 1) % bop_shared_state.players.len()]
+                    [bop_shared_state.opponent_player_index(bop_shared_state.own_player_index)]
                 .player_name
             );
         }
@@ -80,7 +80,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     for n in 0..11 {
         fn item_list_a(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             if let Some(item) = bop_shared_state.players[0].own_item_list.get(args_usize) {
-                item.item_kind.get_item_name()
+                item.item_kind.get_name()
             } else {
                 "".to_string()
             }
@@ -95,7 +95,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             args_usize: usize,
         ) -> String {
             if let Some(item) = bop_shared_state.players[0].own_item_list.get(args_usize) {
-                item.item_kind.get_item_description()
+                item.item_kind.get_description()
             } else {
                 "".to_string()
             }
@@ -109,7 +109,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     for n in 0..10 {
         fn bop_list_b(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             if let Some(item) = bop_shared_state.players[1].own_item_list.get(args_usize) {
-                item.item_kind.get_item_name()
+                item.item_kind.get_name()
             } else {
                 "".to_string()
             }
@@ -124,7 +124,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             args_usize: usize,
         ) -> String {
             if let Some(item) = bop_shared_state.players[1].own_item_list.get(args_usize) {
-                item.item_kind.get_item_description()
+                item.item_kind.get_description()
             } else {
                 "".to_string()
             }
@@ -137,7 +137,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     for n in 0..2 {
         fn player_info_money(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
-            let player_state = &bop_shared_state.players[args_usize].player_state;
+            let player_state = &bop_shared_state.players[args_usize].player_status;
             format!(
                 "{}(+{})",
                 player_state.current_money_amount, player_state.estimated_money_amount
@@ -155,7 +155,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     for n in 0..19 {
         fn scheduled_item(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             if let Some(item) = bop_shared_state.bid_scheduled_items.get(args_usize) {
-                item.item_kind.get_item_name()
+                item.item_kind.get_name()
             } else {
                 "".to_string()
             }
@@ -172,7 +172,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
             args_usize: usize,
         ) -> String {
             if let Some(item) = bop_shared_state.bid_scheduled_items.get(args_usize) {
-                item.item_kind.get_item_description()
+                item.item_kind.get_description()
             } else {
                 "".to_string()
             }
@@ -188,8 +188,10 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     }
     for n in 0..2 {
         fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
-            let hp = bop_shared_state.players[args_usize].player_state.current_hp;
-            let max_hp = bop_shared_state.players[args_usize].player_state.max_hp;
+            let hp = bop_shared_state.players[args_usize]
+                .player_status
+                .current_hp;
+            let max_hp = bop_shared_state.players[args_usize].player_status.max_hp;
             format!("{}/{}", hp, max_hp)
         }
         binds.push(SimpleBinder::new(
@@ -204,7 +206,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     for n in 0..2 {
         fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             let attack_point = bop_shared_state.players[args_usize]
-                .player_state
+                .player_status
                 .attack_point;
             attack_point.to_string()
         }
@@ -220,7 +222,7 @@ pub fn get_binds() -> Vec<SimpleBinder> {
     for n in 0..2 {
         fn player_status(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
             let defence_point = bop_shared_state.players[args_usize]
-                .player_state
+                .player_status
                 .defence_point;
             defence_point.to_string()
         }
@@ -273,17 +275,15 @@ pub fn get_binds() -> Vec<SimpleBinder> {
 
     for n in 0..2 {
         fn damage(bop_shared_state: &mut BoPSharedState, args_usize: usize) -> String {
-            let own_player_state = &bop_shared_state.players[args_usize].player_state;
+            let own_player_state = &bop_shared_state.players[args_usize].player_status;
             let opponent_player_state = &bop_shared_state.players
-                [(args_usize + 1) % bop_shared_state.players.len()]
-            .player_state;
-            if opponent_player_state.attack_point == 0 {
-                return 0.to_string();
-            }
-            (opponent_player_state.attack_point as i32 - own_player_state.defence_point as i32)
-                .max(1)
+                [bop_shared_state.opponent_player_index(args_usize)]
+            .player_status;
+            own_player_state
+                .get_damage(opponent_player_state.attack_point)
                 .to_string()
         }
+
         binds.push(SimpleBinder::new(
             get_element_by_id(format!(
                 "simple-binder-status-damage-{}",

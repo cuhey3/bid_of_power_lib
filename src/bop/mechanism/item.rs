@@ -1,27 +1,17 @@
-use crate::bop::mechanism::item::ItemKind::{
-    ATKSwap, ArmourBreak, Balance, BuildUp, ChainMail, Chaos, Cure, DEFSwap, Dagger, Excalibur,
-    GainUp, GoldenDagger, GoldenHeal, GoldenSkin, HPSwap, LeatherArmour, LongSword, MagicBolt,
-    Shrink, Treasure, Weakness,
-};
+use crate::bop::mechanism::item::ItemKind::*;
 use crate::bop::state::bop_shared_state::BoPSharedState;
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
-use wasm_bindgen_test::console_log;
 
 #[derive(Clone, Debug)]
 pub struct Item {
-    pub sold_for: u32,
-    pub is_used: bool,
+    // 使用済みを表すフラグなどあったが参照箇所がないので一旦消している
     pub item_kind: ItemKind,
 }
 
 impl Item {
     pub fn from(item_kind: ItemKind) -> Item {
-        Item {
-            sold_for: 0,
-            is_used: false,
-            item_kind,
-        }
+        Item { item_kind }
     }
     pub fn item_set_default() -> Vec<Item> {
         let mut rng = rand::thread_rng();
@@ -62,33 +52,15 @@ impl Item {
         status: String,
         amount: i32,
     ) -> impl FnMut(&mut BoPSharedState) {
-        move |item_game_shared_state: &mut BoPSharedState| {
+        move |bop_shared_state: &mut BoPSharedState| {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % item_game_shared_state.players.len()
+                bop_shared_state.opponent_player_index(use_player_index)
             };
-            let state = &mut item_game_shared_state.players[target_player_index].player_state;
-            match status.as_str() {
-                "ATK" => state.attack_point = (state.attack_point as i32 + amount).max(0) as u32,
-                "DEF" => state.defence_point = (state.defence_point as i32 + amount).max(0) as u32,
-                "HP" => {
-                    state.current_hp =
-                        ((state.current_hp as i32 + amount).max(0) as u32).min(state.max_hp)
-                }
-                "MHP" => state.max_hp = (state.max_hp as i32 + amount).max(0) as u32,
-                "Money" => {
-                    state.current_money_amount =
-                        (state.current_money_amount as i32 + amount).max(0) as u32
-                }
-                "Gain" => {
-                    state.estimated_money_amount =
-                        (state.estimated_money_amount as i32 + amount).max(0) as u32
-                }
-                _ => {
-                    panic!()
-                }
-            }
+            bop_shared_state.players[target_player_index]
+                .player_status
+                .capped_update_status(&status, amount);
         }
     }
 
@@ -102,60 +74,44 @@ impl Item {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % bop_shared_state.players.len()
+                bop_shared_state.opponent_player_index(use_player_index)
             };
-            let state = &mut bop_shared_state.players[target_player_index].player_state;
-            match status.as_str() {
-                "ATK" => {
-                    state.attack_point +=
-                        (state.current_money_amount as f64 * scale).max(0.0) as u32
-                }
-                "DEF" => {
-                    state.defence_point +=
-                        (state.current_money_amount as f64 * scale).max(0.0) as u32
-                }
-                "HP" => {
-                    state.current_hp = (state.current_hp
-                        + (state.current_money_amount as f64 * scale).max(0.0) as u32)
-                        .min(state.max_hp)
-                }
-                "MHP" => {
-                    state.max_hp += (state.current_money_amount as f64 * scale).max(0.0) as u32
-                }
-                _ => {
-                    panic!()
-                }
-            }
+            let amount = (bop_shared_state.players[target_player_index]
+                .player_status
+                .current_money_amount as f64
+                * scale) as i32;
+            bop_shared_state.players[target_player_index]
+                .player_status
+                .capped_update_status(&status, amount);
         }
     }
     // HP/MHP は一度に処理する
     // プレイヤーの入力を取れないうちはプレイヤー1と2に固定
     pub fn create_swap_status_func(status: String) -> impl FnMut(&mut BoPSharedState) {
         move |bop_shared_state: &mut BoPSharedState| match status.as_str() {
-            "ATK" => {
-                let state_a_amount = bop_shared_state.players[0].player_state.attack_point;
-                let state_b_amount = bop_shared_state.players[1].player_state.attack_point;
-                bop_shared_state.players[0].player_state.attack_point = state_b_amount;
-                bop_shared_state.players[1].player_state.attack_point = state_a_amount;
-            }
-            "DEF" => {
-                let state_a_amount = bop_shared_state.players[0].player_state.defence_point;
-                let state_b_amount = bop_shared_state.players[1].player_state.defence_point;
-                bop_shared_state.players[0].player_state.defence_point = state_b_amount;
-                bop_shared_state.players[1].player_state.defence_point = state_a_amount;
-            }
             "HP" | "MHP" => {
-                let state_a_amount = bop_shared_state.players[0].player_state.max_hp;
-                let state_b_amount = bop_shared_state.players[1].player_state.max_hp;
-                bop_shared_state.players[0].player_state.max_hp = state_b_amount;
-                bop_shared_state.players[1].player_state.max_hp = state_a_amount;
-                let state_a_amount = bop_shared_state.players[0].player_state.current_hp;
-                let state_b_amount = bop_shared_state.players[1].player_state.current_hp;
-                bop_shared_state.players[0].player_state.current_hp = state_b_amount;
-                bop_shared_state.players[1].player_state.current_hp = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_status.max_hp;
+                let state_b_amount = bop_shared_state.players[1].player_status.max_hp;
+                bop_shared_state.players[0].player_status.max_hp = state_b_amount;
+                bop_shared_state.players[1].player_status.max_hp = state_a_amount;
+                let state_a_amount = bop_shared_state.players[0].player_status.current_hp;
+                let state_b_amount = bop_shared_state.players[1].player_status.current_hp;
+                bop_shared_state.players[0].player_status.current_hp = state_b_amount;
+                bop_shared_state.players[1].player_status.current_hp = state_a_amount;
             }
             _ => {
-                panic!()
+                let state_a_amount = bop_shared_state.players[0]
+                    .player_status
+                    .get_amount(&status);
+                let state_b_amount = bop_shared_state.players[1]
+                    .player_status
+                    .get_amount(&status);
+                bop_shared_state.players[1]
+                    .player_status
+                    .set_amount(&status, state_a_amount);
+                bop_shared_state.players[0]
+                    .player_status
+                    .set_amount(&status, state_b_amount);
             }
         }
     }
@@ -168,18 +124,18 @@ impl Item {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % bop_shared_state.players.len()
+                bop_shared_state.opponent_player_index(use_player_index)
             };
-            let state = &mut bop_shared_state.players[target_player_index].player_state;
-            match status.as_str() {
-                "ATK" => state.attack_point /= 2,
-                "DEF" => state.defence_point /= 2,
-                "HP" => state.current_hp /= 2,
-                "MHP" => state.max_hp /= 2,
-                _ => {
-                    panic!()
-                }
-            }
+            // 変化量は半分よりも多い（端数切り上げ）
+            let amount = (bop_shared_state.players[target_player_index]
+                .player_status
+                .get_amount(&status) as f64
+                * 0.5)
+                .ceil() as i32
+                * -1;
+            bop_shared_state.players[target_player_index]
+                .player_status
+                .capped_update_status(&status, amount);
         }
     }
 
@@ -195,69 +151,21 @@ impl Item {
             let target_player_index = if target_is_own {
                 use_player_index
             } else {
-                (use_player_index + 1) % bop_shared_state.players.len()
+                bop_shared_state.opponent_player_index(use_player_index)
             };
             let target_player_status =
-                &mut bop_shared_state.players[target_player_index].player_state;
-            let status_a_amount = match status_a.as_str() {
-                "HP" => target_player_status.current_hp,
-                "MHP" => target_player_status.max_hp,
-                "ATK" => target_player_status.attack_point,
-                "DEF" => target_player_status.defence_point,
-                _ => {
-                    console_log!("does not implemented {}", status_a);
-                    panic!()
-                }
-            };
-            let status_b_amount = match status_b.as_str() {
-                "HP" => target_player_status.current_hp,
-                "MHP" => target_player_status.max_hp,
-                "ATK" => target_player_status.attack_point,
-                "DEF" => target_player_status.defence_point,
-                _ => {
-                    console_log!("does not implemented {}", status_b);
-                    panic!()
-                }
-            };
+                &mut bop_shared_state.players[target_player_index].player_status;
+            let status_a_amount = target_player_status.get_amount(&status_a);
+            let status_b_amount = target_player_status.get_amount(&status_b);
             let new_amount = if is_balance {
                 status_a_amount.max(status_b_amount)
             } else {
                 status_a_amount.min(status_b_amount)
             };
-            match status_a.as_str() {
-                "HP" => {
-                    target_player_status.current_hp = ((new_amount as i32 + modifier).max(0) as u32)
-                        .min(target_player_status.max_hp)
-                }
-                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier).max(0) as u32,
-                "ATK" => {
-                    target_player_status.attack_point = (new_amount as i32 + modifier).max(0) as u32
-                }
-                "DEF" => {
-                    target_player_status.defence_point =
-                        (new_amount as i32 + modifier).max(0) as u32
-                }
-                _ => {
-                    panic!()
-                }
-            };
-            match status_b.as_str() {
-                "HP" => {
-                    target_player_status.current_hp = ((new_amount as i32 + modifier).max(0) as u32)
-                        .min(target_player_status.max_hp)
-                }
-                "MHP" => target_player_status.max_hp = (new_amount as i32 + modifier).max(0) as u32,
-                "ATK" => {
-                    target_player_status.attack_point = (new_amount as i32 + modifier).max(0) as u32
-                }
-                "DEF" => {
-                    target_player_status.defence_point =
-                        (new_amount as i32 + modifier).max(0) as u32
-                }
-                _ => {
-                    panic!()
-                }
-            };
+            for status in [status_a.clone(), status_b.clone()].iter() {
+                target_player_status
+                    .set_amount(status, (new_amount as i32 + modifier).max(0) as u32);
+            }
         }
     }
     pub fn combine_func(
@@ -468,7 +376,7 @@ pub enum ItemKind {
 }
 
 impl ItemKind {
-    pub fn get_item_name(&self) -> String {
+    pub fn get_name(&self) -> String {
         match self {
             LongSword => "ロングソード",
             LeatherArmour => "レザーアーマー",
@@ -494,7 +402,7 @@ impl ItemKind {
         }
         .to_string()
     }
-    pub fn get_item_description(&self) -> String {
+    pub fn get_description(&self) -> String {
         match self {
             LongSword => "自己ATK+10",
             LeatherArmour => "自己DEF+5",

@@ -1,2 +1,2 @@
 pub mod item;
-pub mod player_state;
+pub mod player_status;

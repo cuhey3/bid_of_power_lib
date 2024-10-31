@@ -207,11 +207,7 @@ impl Phase {
             game_state: &mut BoPSharedState,
         ) -> CheckPhaseCompleteResult {
             let mut result = CheckPhaseCompleteResult::empty();
-            if let Some(_) = game_state
-                .players
-                .iter()
-                .find(|player| player.player_state.current_hp == 0)
-            {
+            if game_state.game_is_end() {
                 result.is_phase_complete = true;
                 result.next_phase_index = Some(GameEnd as i32 as usize);
                 return result;
@@ -291,11 +287,7 @@ impl Phase {
             let mut result = CheckPhaseCompleteResult::empty();
             let player_len = game_state.players.len();
             let own_player_index = game_state.own_player_index;
-            if let Some(_) = game_state
-                .players
-                .iter()
-                .find(|player| player.player_state.current_hp == 0)
-            {
+            if game_state.game_is_end() {
                 result.is_phase_complete = true;
                 result.next_phase_index = Some(GameEnd as i32 as usize);
                 return result;

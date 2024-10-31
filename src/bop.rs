@@ -10,7 +10,7 @@ use crate::features::animation::Animation;
 use crate::features::websocket::{ChannelMessage, MessageType, WebSocketWrapper};
 use crate::svg::SharedElements;
 use mechanism::item::Item;
-use mechanism::player_state::PlayerState;
+use mechanism::player_status::PlayerStatus;
 use rand::Rng;
 use scenes::title::TitleState;
 use state::bop_shared_state::BoPSharedState;
@@ -37,16 +37,17 @@ pub fn mount() -> Engine {
                 game_start_is_approved: false,
                 battle_is_viewed: false,
                 own_item_list: vec![],
-                player_state: PlayerState::init(),
+                player_status: PlayerStatus::init(),
             },
             BoPPlayer {
                 player_name: "プレイヤー2".to_string(),
                 game_start_is_approved: false,
                 battle_is_viewed: false,
                 own_item_list: vec![],
-                player_state: PlayerState::init(),
+                player_status: PlayerStatus::init(),
             },
         ],
+        players_len: 2,
         own_player_index: 0,
         items_bid_on: vec![],
         bid_input: vec![
